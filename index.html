@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F6F7FB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1220" media="(prefers-color-scheme: dark)">
+<!-- App instalable (PWA): en el celular, «Agregar a la pantalla de inicio» -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Realize">
+<title>Realize · Aprende inglés de verdad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600..800;1,9..144,400..600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <!-- Solo en móvil: la marca arriba y el acceso a Ajustes (en escritorio viven en la barra lateral) -->
+  <header class="topbar">
+    <a class="brand" href="#/inicio" aria-label="Realize, ir a inicio">
+      <span class="brand-mark" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></svg></span>
+      <span class="brand-word">Realize<span class="brand-dot">.</span></span>
+    </a>
+    <span class="topbar-end">
+    <!-- Estado de la sincronización entre dispositivos (js/sync.js) -->
+    <button type="button" class="sync-chip" data-action="sync-now" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 19h10.5a4.5 4.5 0 0 0 .6-8.96A6.5 6.5 0 0 0 5.6 9.4 4.8 4.8 0 0 0 7 19z"/></svg>
+      <span class="sync-chip-label">Sincronizado</span>
+    </button>
+    <a class="icon-btn topbar-more" href="#/ajustes" data-route="ajustes" aria-label="Ajustes" title="Ajustes">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+    </a>
+    </span>
+  </header>
+
+  <!-- En móvil es una barra inferior; en escritorio, la barra lateral de las referencias -->
+  <nav class="nav" aria-label="Principal">
+    <div class="nav-brand">
+      <a class="brand" href="#/inicio" aria-label="Realize, ir a inicio">
+        <span class="brand-mark" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></svg></span>
+        <span class="brand-word">Realize<span class="brand-dot">.</span></span>
+      </a>
+    </div>
+    <a class="nav-link" href="#/inicio" data-route="inicio">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+      <span>Inicio</span>
+    </a>
+    <a class="nav-link" href="#/estudiar" data-route="estudiar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l4-1L19 8a2.1 2.1 0 0 0-3-3L5 16z"/></svg>
+      <span>Estudiar</span>
+    </a>
+    <!-- Submenú de Estudiar (solo escritorio; en móvil la pestaña abre la pantalla con las dos opciones) -->
+    <div class="nav-sub" role="group" aria-label="Estudiar">
+      <a class="nav-sublink" href="#/estudiar/diario" data-sub="diario"><span class="nav-sub-dot" aria-hidden="true"></span>Repaso diario</a>
+      <a class="nav-sublink" href="#/estudiar/grupos" data-sub="grupos"><span class="nav-sub-dot" aria-hidden="true"></span>Repaso de grupos</a>
+    </div>
+    <a class="nav-link" href="#/lecturas" data-route="lecturas">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M8 7h7"/></svg>
+      <span>Lecturas</span>
+    </a>
+    <a class="nav-link" href="#/palabras" data-route="palabras">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      <span class="l-long">Mis palabras</span><span class="l-short">Palabras</span>
+    </a>
+    <a class="nav-link" href="#/progreso" data-route="progreso">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7H16"/></svg>
+      <span class="l-long">Tu camino</span><span class="l-short">Camino</span>
+    </a>
+    <a class="nav-link" href="#/agregar" data-route="agregar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      <span>Agregar</span>
+    </a>
+    <a class="nav-link" href="#/ajustes" data-route="ajustes">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
+      <span>Ajustes</span>
+    </a>
+    <div class="nav-spacer"></div>
+    <button type="button" class="sync-chip sync-chip-nav" data-action="sync-now" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 19h10.5a4.5 4.5 0 0 0 .6-8.96A6.5 6.5 0 0 0 5.6 9.4 4.8 4.8 0 0 0 7 19z"/></svg>
+      <span class="sync-chip-label">Sincronizado</span>
+    </button>
+  </nav>
+
+  <main class="main" id="view" tabindex="-1"></main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- Scripts clásicos que comparten el ámbito global; el orden importa:
+     datos (NGSL 1.2, CC BY-SA 4.0, y expresiones), núcleo, UI y el módulo de lecturas,
+     que se registra en el router. Todo arranca en DOMContentLoaded (js/ui/events.js).
+     PDF.js, JSZip y mammoth.js se cargan desde jsDelivr solo cuando se abre un archivo. -->
+<script src="js/wordlist.js"></script>
+<script src="js/phrases.js"></script>
+<script src="js/core.js"></script>
+<script src="js/srs.js"></script>
+<script src="js/samples.js"></script>
+<script src="js/store.js"></script>
+<script src="js/learning.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/ui/base.js"></script>
+<script src="js/ui/home.js"></script>
+<script src="js/ui/progress.js"></script>
+<script src="js/ui/words.js"></script>
+<script src="js/ui/settings.js"></script>
+<script src="js/ui/session.js"></script>
+<script src="js/ui/router.js"></script>
+<script src="js/ui/actions.js"></script>
+<script src="js/ui/events.js"></script>
+<script src="js/ui/groups.js"></script>
+<script src="js/reading.js"></script>
+<script src="js/sync.js"></script>
+</body>
+</html>
