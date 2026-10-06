@@ -136,7 +136,7 @@ function rankedCands(seg) {
 
 // Una palabra de tu lista vista como candidata. Las que vienen de una lectura traen cuántas veces
 // aparecieron; las que escribiste tú no tienen texto, así que solo cuenta su uso en el idioma.
-function wordInfo(w) {
+function wordImportance(w) {
   const forms = [...new Set([normalize(w.word), lemmaOf(w), ...(w.forms || [])])];
   return infoOf({
     lemma: normalize(w.word), forms, freq: Math.max(1, w.freq || 0), noText: !w.freq,
@@ -149,16 +149,16 @@ function wordInfo(w) {
 const LOW_VALUE_BELOW = 22;
 function isLowValue(w) {
   if (w.pinned || isLearned(w) || !freqData.map) return false;
-  const i = wordInfo(w);
+  const i = wordImportance(w);
   return i.skip || i.score < LOW_VALUE_BELOW;
 }
 
 /* ---------- Meta de la lectura ---------- */
 
 const PLAN_MODES = {
-  count: { label: 'Cantidad', def: 15, min: 1, max: 300, presets: [10, 15, 25, 40] },
-  share: { label: 'Porcentaje', def: 50, min: 5, max: 100, presets: [25, 50, 75, 100] },
-  coverage: { label: 'Comprensión', def: 96, min: 80, max: 100, presets: [95, 96, 98] },
+  count: { label: 'Cantidad', help: 'Elige cuántas palabras quieres aprender de esta lectura.', def: 15, min: 1, max: 300, presets: [10, 15, 25, 40] },
+  share: { label: '% de nuevas', help: 'Elige qué parte de las palabras que no sabes quieres aprender (las más importantes primero).', def: 50, min: 5, max: 100, presets: [25, 50, 75, 100] },
+  coverage: { label: 'Comprensión', help: 'Elige qué parte del texto quieres entender; la app calcula cuántas palabras necesitas.', def: 96, min: 80, max: 100, presets: [95, 96, 98] },
 };
 const STUDYING_KEYS = ['familiar', 'unknown', 'studying'];
 
@@ -177,7 +177,8 @@ function planFor(seg) {
     else if (key === 'skipped') skipped++;
     else if (key === 'pending') { if (infoOf(c).skip) skipped++; else pending.push(c); }
   }
-  const cur = Math.min(100, segmentCoverage(seg) + (chosenFreq / tokens) * 100);
+  const now = segmentCoverage(seg);                                        // lo que sabes hoy (el número de arriba)
+  const cur = Math.min(100, now + (chosenFreq / tokens) * 100);            // si aprendes las que ya elegiste
   const pool = chosen + pending.length;
   let K, reachable = true;
   if (plan.mode === 'share') K = Math.ceil((plan.value / 100) * pool);
@@ -190,7 +191,7 @@ function planFor(seg) {
   K = Math.min(K, pool);
   const take = pending.slice(0, Math.max(0, K - chosen));
   const proj = Math.min(100, cur + (take.reduce((n, c) => n + c.freq, 0) / tokens) * 100);
-  return { plan, chosen, K, need: take.length, take, cur, proj, pool, reachable, skipped };
+  return { plan, chosen, K, need: take.length, take, now, cur, proj, pool, reachable, skipped };
 }
 
 const planPace = seg => Math.max(1, dailyLimit(seg.mode === 'intensive' ? 'intensive' : 'relaxed') || 1);
@@ -203,8 +204,8 @@ function savePlan(seg) {
 // Barra de comprensión: lo que ya sabes, lo que sumarías con tu meta y el objetivo general.
 function planBar(p) {
   const target = state.data.settings.coverageTarget;
-  return `<div class="plan-bar" role="img" aria-label="Comprensión actual ${fmtPct(p.cur)}, con tu meta ${fmtPct(p.proj)}">
-    <i class="proj" style="width:${p.proj}%"></i><i class="now" style="width:${p.cur}%"></i><b class="goal" style="left:${target}%" title="Objetivo ${target}%"></b></div>`;
+  return `<div class="plan-bar" role="img" aria-label="Hoy conoces ${fmtPct(p.now)}; con las palabras que elegiste, ${fmtPct(p.cur)}; con tu meta, ${fmtPct(p.proj)}">
+    <i class="proj" style="width:${p.proj}%"></i><i class="cur" style="width:${p.cur}%"></i><i class="now" style="width:${p.now}%"></i><b class="goal" style="left:${target}%" title="Objetivo ${target}%"></b></div>`;
 }
 
 function planSummaryHTML(seg) {
@@ -212,8 +213,11 @@ function planSummaryHTML(seg) {
   const per = planPace(seg);
   const rows = [];
   if (!p.pool) return '<p class="hint">No quedan palabras por estudiar en esta lectura.</p>';
-  rows.push(`<div class="kv"><span>Palabras para estudiar</span><b>${p.K}${p.chosen ? ` <span class="muted">· ya llevas ${p.chosen}</span>` : ''}</b></div>`);
-  rows.push(`<div class="kv"><span>Comprensión del texto</span><b>${fmtPct(p.cur)} → <span style="color:var(--accent-text)">${fmtPct(p.proj)}</span></b></div>`);
+  const done = p.K > 0 && p.chosen >= p.K;
+  rows.push(`<div class="kv"><span>Palabras elegidas para estudiar</span><b>${p.chosen} de ${p.K} ${done ? '<span class="chip chip-ok">Meta cumplida</span>' : ''}</b></div>`);
+  rows.push(`<div class="kv"><span>Hoy conoces</span><b>${fmtPct(p.now)}</b></div>`);
+  if (p.chosen) rows.push(`<div class="kv"><span>Cuando aprendas ${p.chosen === 1 ? 'la que elegiste' : `las ${p.chosen} que elegiste`}</span><b${p.need ? '' : ' style="color:var(--accent-text)"'}>${fmtPct(p.cur)}</b></div>`);
+  if (p.need) rows.push(`<div class="kv"><span>Cuando aprendas también ${p.need === 1 ? 'la que te falta' : `las ${p.need} que te faltan`}</span><b style="color:var(--accent-text)">${fmtPct(p.proj)}</b></div>`);
   if (p.need) rows.push(`<div class="kv"><span>A tu ritmo (${per} nuevas al día)</span><b>unos ${plural(Math.max(1, Math.ceil(p.need / per)), 'día', 'días')}</b></div>`);
   const note = p.plan.mode === 'coverage' && !p.reachable
     ? `<p class="hint">Sin las palabras descartadas llegas como máximo al ${fmtPct(p.proj)}. Si quieres más, baja la meta.</p>` : '';
@@ -225,7 +229,7 @@ function planSummaryHTML(seg) {
 function planCard(seg) {
   const p = planFor(seg);
   const m = p.plan.mode, def = PLAN_MODES[m];
-  const lead = { count: ['Quiero aprender', 'palabras'], share: ['Quiero aprender el', '% de las palabras nuevas'], coverage: ['Quiero entender el', '% del texto'] }[m];
+  const lead = { count: ['Quiero aprender', 'palabras'], share: ['Quiero aprender el', '% de las palabras que no sé'], coverage: ['Quiero entender el', '% del texto'] }[m];
   const idx = Object.keys(PLAN_MODES).indexOf(m);
   return `<div class="card stack plan-card">
     <div class="row nowrap"><span class="icon-tile">${icon('target')}</span>
@@ -234,6 +238,7 @@ function planCard(seg) {
     <div class="seg-tabs n3 ${state.ui.justPlanMode ? 'slide' : ''}" role="radiogroup" aria-label="Tipo de meta" data-active="${idx}">
       ${Object.entries(PLAN_MODES).map(([k, d]) => `<button type="button" class="seg-tab" role="radio" aria-checked="${k === m}" aria-selected="${k === m}" data-action="plan-mode" data-mode="${k}">${d.label}</button>`).join('')}
     </div>
+    <span class="hint plan-help">${def.help}</span>
     <div class="plan-input">
       <label class="plan-lead" for="plan-value">${lead[0]}</label>
       <input id="plan-value" class="input" type="number" inputmode="numeric" min="${def.min}" max="${def.max}" value="${p.plan.value}" data-bind="plan-value" aria-describedby="plan-unit">

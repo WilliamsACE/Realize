@@ -974,6 +974,7 @@ function renderSegment(id) {
     <div class="row between baseline"><span class="coverage-text">Ya conoces el <b>${fmtPct(p)}</b> de las palabras de este texto</span>
       ${ready ? `<span class="chip chip-ok">${icon('check', 16)} Listo para leer</span>` : `<span class="chip">Objetivo ${target}%</span>`}</div>
     ${coverageBar(seg)}
+    ${(() => { const q = planFor(seg); return q.chosen && q.cur - q.now >= 0.1 ? `<span class="hint" style="font-weight:600;color:var(--accent-text)">Con ${q.chosen === 1 ? 'la palabra que elegiste' : `las ${q.chosen} palabras que elegiste`} estudiar llegarás al ${fmtPct(q.cur)}: sube cuando las aprendas.</span>` : ''; })()}
     <span class="hint">Cuenta ocurrencias: una palabra que aparece 30 veces pesa más que una que aparece una vez. Las palabras comunes, los nombres propios y las que ya sabes cuentan como conocidas.${ready ? '' : ` Te falta ${fmtPct(Math.max(0, target - p))}.`}</span>
   </div>
 

@@ -113,7 +113,7 @@ function filteredWords() {
     if (/^s\d$/.test(filter)) return w.stage === Number(filter[1]);
     return true;
   }).sort(filter === 'lowvalue'
-    ? (a, b) => wordInfo(a).score - wordInfo(b).score || a.word.localeCompare(b.word)   // las menos útiles primero
+    ? (a, b) => wordImportance(a).score - wordImportance(b).score || a.word.localeCompare(b.word)   // las menos útiles primero
     : (a, b) => pinnedFirst(b) - pinnedFirst(a) || a.word.localeCompare(b.word));
 }
 
@@ -147,7 +147,7 @@ function wordListHTML() {
   const low = state.ui.filter === 'lowvalue';
   return (low ? lowValueIntro(list) : '') + list.map(w => {
     const mode = wordMode(w);
-    const why = low ? wordInfo(w) : null;
+    const why = low ? wordImportance(w) : null;
     return `
     <div class="list-row">
       <div class="stack-xs">
