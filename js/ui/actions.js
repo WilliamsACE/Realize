@@ -431,14 +431,13 @@ const actions = {
     if (!w) return;
     w.pinned = !w.pinned;
     persist();
-    state.ui.justPinned = w.pinned ? w.id : null;
+    state.ui.justPinned = w.pinned ? new Set([w.id]) : null;
     // En recuerdo y cloze la palabra es la respuesta: el aviso no la nombra.
     const name = el.dataset.variant === 'hidden' ? 'Palabra' : `«${w.word}»`;
     toast(w.pinned ? `${name} fijada: saldrá en cada sesión hasta que la aprendas` : `${name} ya no está fijada`);
     // Solo se repinta la lista (para no perder la búsqueda ni el scroll) o, en las
     // sesiones, el propio botón (para no perder lo que se está respondiendo).
-    const list = $('#word-list');
-    if (list) list.innerHTML = wordListHTML();
+    if ($('#word-list')) refreshWordList();
     else view.querySelectorAll(`.pin-btn[data-id="${CSS.escape(w.id)}"]`).forEach(b => { b.outerHTML = pinBtn(w, b.dataset.variant); });
     state.ui.justPinned = null;
   },

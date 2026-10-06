@@ -37,6 +37,7 @@ const ICON_PATHS = {
   repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   tick: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  checksq: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 12.5l3 3 5-6"/>',
   history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>',
   cloud: '<path d="M7 19h10.5a4.5 4.5 0 0 0 .6-8.96A6.5 6.5 0 0 0 5.6 9.4 4.8 4.8 0 0 0 7 19z"/>',
   sync: '<path d="M20 11a8 8 0 0 0-14.6-4.6L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.6 4.6L20 16"/><path d="M20 20v-4h-4"/>',
@@ -91,7 +92,7 @@ function wordTitle(w, { pin = true } = {}) {
 // sesiones ('title') o en ejercicios donde la palabra es la respuesta ('hidden': no la nombra).
 function pinBtn(w, variant = 'list') {
   const small = variant !== 'list';
-  return `<button type="button" class="${small ? 'pin-mark' : 'icon-btn'} pin-btn ${w.pinned ? 'is-pinned' : ''} ${state.ui.justPinned === w.id ? 'just' : ''}" data-action="toggle-pin" data-id="${esc(w.id)}" data-variant="${variant}" aria-pressed="${!!w.pinned}"
+  return `<button type="button" class="${small ? 'pin-mark' : 'icon-btn'} pin-btn ${w.pinned ? 'is-pinned' : ''} ${state.ui.justPinned?.has(w.id) ? 'just' : ''}" data-action="toggle-pin" data-id="${esc(w.id)}" data-variant="${variant}" aria-pressed="${!!w.pinned}"
     aria-label="${w.pinned ? 'Quitar de fijadas' : 'Fijar'} ${variant === 'hidden' ? 'esta palabra' : esc(w.word)}" title="${w.pinned ? 'Fijada: sale en cada sesión hasta que la aprendas' : 'Fijar: que salga más seguido hasta aprenderla'}">${icon('star', small ? 16 : 20)}</button>`;
 }
 

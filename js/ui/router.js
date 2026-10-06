@@ -16,7 +16,7 @@ const ROUTE_ENTER = {
     const s = state.ui.session;
     if (!s || s.finished) { state.ui.session = buildSession(state.data); prepareExercise(); }
   },
-  palabras: () => { state.ui.pinOrder = null; if (state.ui.filter === 'lowvalue') ensureFreq(); },   // el orden de las fijadas se toma al dibujar la lista
+  palabras: () => { state.ui.pinOrder = null; state.ui.sel = new Set(); state.ui.selMode = false; if (state.ui.filter === 'lowvalue') ensureFreq(); },   // el orden de las fijadas se toma al dibujar la lista
   editar: param => {
     const w = findWord(param);
     if (w && state.ui.editDraft?.id !== w.id) state.ui.editDraft = { id: w.id, stage: w.stage, ...cleanContent(w) };

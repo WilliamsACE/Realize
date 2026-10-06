@@ -149,7 +149,8 @@ function wordListHTML() {
     const mode = wordMode(w);
     const why = low ? wordImportance(w) : null;
     return `
-    <div class="list-row">
+    <div class="list-row ${selSet().has(w.id) ? 'is-selected' : ''}" data-wid="${esc(w.id)}">
+      ${selCheckHTML(w)}
       <div class="stack-xs">
         <span class="row gap-sm"><span class="list-word">${esc(w.word)}</span>${leechBadge(w)}${isMastered(w) ? '<span class="chip chip-ok">Dominada</span>' : isLearned(w) ? '<span class="chip chip-ok">Aprendida</span>' : ''}</span>
         <span class="muted small">${isStudyReady(w) ? esc(w.translation || w.definition) : '<i>Sin significado todavía</i>'}</span>
@@ -192,11 +193,14 @@ function waitingBanner() {
 
 function renderWords() {
   const u = state.ui;
+  pruneSelection();
+  document.body.classList.toggle('has-selbar', selActive());
   return `
   <div class="row between">
     <div class="page-head"><span class="muted small">${plural(state.data.words.length, 'palabra', 'palabras')}</span><h1>Mis palabras</h1></div>
     <div class="actions">
       <a class="btn btn-secondary btn-sm btn-icon-m" href="#/grupos" aria-label="Grupos de palabras" title="Grupos de palabras">${icon('cards', 18)}<span>Grupos${groups().length ? ` · ${groups().length}` : ''}</span></a>
+      <button type="button" class="btn btn-secondary btn-sm btn-icon-m sel-toggle ${selActive() ? 'is-on' : ''}" data-action="sel-mode" aria-pressed="${!!u.selMode}" aria-label="Seleccionar palabras" title="Seleccionar varias palabras (Shift + clic, Ctrl + A)">${icon('checksq', 18)}<span>${selActive() ? 'Listo' : 'Seleccionar'}</span></button>
       <button type="button" class="btn btn-secondary btn-sm btn-icon-m" data-action="export-csv-all" aria-label="Exportar CSV para Anki" title="Exportar CSV para Anki">${icon('download', 18)}<span>CSV para Anki</span></button>
       <a class="btn btn-primary btn-sm only-desktop" href="#/agregar">${icon('plus', 18)}<span>Agregar</span></a>
     </div>
@@ -209,7 +213,8 @@ function renderWords() {
       ${FILTERS.map(([k, l]) => `<option value="${k}" ${u.filter === k ? 'selected' : ''}>${l}</option>`).join('')}
     </select>
   </div>
-  <div class="card list" id="word-list">${wordListHTML()}</div>`;
+  <div class="card list ${selActive() ? 'selecting' : ''}" id="word-list">${wordListHTML()}</div>
+  <div class="sel-bar" id="sel-bar" role="toolbar" aria-label="Acciones para las palabras seleccionadas" ${selActive() ? '' : 'hidden'}>${selActive() ? selectionBarHTML() : ''}</div>`;
 }
 
 /* ---------- Editar palabra ---------- */
