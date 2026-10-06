@@ -383,12 +383,14 @@ const FEEDBACK_SCHEMA = {
     corrected: S,
     natural: S,
     explanation: S,
+    sense: S,
+    sameSense: { type: 'BOOLEAN' },
   },
-  required: ['verdict', 'errors', 'corrected', 'natural', 'explanation'],
+  required: ['verdict', 'errors', 'corrected', 'natural', 'explanation', 'sense', 'sameSense'],
 };
 
 function feedbackSystem(word) {
-  return `Eres un tutor de inglés para un hispanohablante. Evalúa si la palabra "${word}" se usó correctamente en el contexto. Sé preciso, amable y breve. Responde solo con JSON válido.`;
+  return `Eres un tutor de inglés para un hispanohablante. Evalúa si la palabra "${word}" se usó correctamente en el contexto, con cualquiera de sus significados reales. Sé preciso, amable y breve. Responde solo con JSON válido.`;
 }
 
 // Lo que el usuario eligió no corregir en sus oraciones (Ajustes → Estudio).
@@ -410,15 +412,22 @@ function onlyIgnored(e, s) {
 
 function feedbackPrompt(w, sentence, settings = state.data.settings) {
   const ignored = ignoredAspects(settings);
-  return `Palabra objetivo: "${w.word}"${w.pos ? ` (${w.pos})` : ''}${w.definition ? ` — significado: ${w.definition}` : ''}
+  const studied = [w.translation && `«${w.translation}»`, w.definition && `(${w.definition})`].filter(Boolean).join(' ');
+  return `Palabra objetivo: "${w.word}"${w.pos ? ` (${w.pos})` : ''}
+Significado que el estudiante está aprendiendo: ${studied || 'no indicado'}${w.otherMeanings?.length ? `
+Otros significados de la palabra: ${w.otherMeanings.join('; ')}` : ''}
 Oración del estudiante: """${sentence}"""
 
+Primero identifica con qué significado usó el estudiante "${w.word}" EN SU ORACIÓN. No supongas que es el que está aprendiendo: una palabra puede tener varios significados reales (p. ej. "dazzle" = impresionar o deslumbrar con luz).
+
 Devuelve JSON con estos campos:
-- verdict: "correcto" si la palabra se usa con el significado y la función gramatical adecuados y la oración no tiene errores; "casi" si el significado de la palabra es correcto pero hay errores de gramática u ortografía o una colocación poco natural; "incorrecto" si la palabra se usa con un significado equivocado, en una función gramatical incorrecta o no aparece.
+- sense: el significado con el que la usó en esta oración, en español, de 1 a 4 palabras (p. ej. "deslumbrar (con luz)").
+- sameSense: true si coincide con el significado que está aprendiendo; false si es otro significado real de la palabra.
+- verdict: "correcto" si la palabra se usa con un significado real y la función gramatical adecuada y la oración no tiene errores (usar otro significado real NO es un error); "casi" si la palabra está bien usada pero hay errores de gramática u ortografía o una colocación poco natural; "incorrecto" si la palabra se usa con un significado que no tiene, en una función gramatical incorrecta o no aparece.
 - errors: lista de errores. "fragment" es el texto EXACTO copiado de la oración del estudiante (lo más corto posible), "correction" es el reemplazo y "explanation" una explicación muy breve en español. Lista vacía si no hay errores.
 - corrected: la oración con los mínimos cambios necesarios para que sea correcta (igual a la original si ya lo es).
 - natural: una versión más natural, como la diría un hablante nativo, manteniendo la idea.
-- explanation: explicación breve en español, máximo 3 líneas, enfocada en el uso de "${w.word}".${ignored.length ? `
+- explanation: explicación breve en español, máximo 3 líneas, enfocada en el uso de "${w.word}" con el significado que el estudiante USÓ (sense). Nunca expliques la oración como si tuviera el significado que está aprendiendo si no lo tiene; si sameSense es false, dilo con claridad.${ignored.length ? `
 
 IMPORTANTE: el estudiante pidió ignorar ${ignored.join('; ')}. No los cuentes como errores, no los incluyas en "errors", no bajes el veredicto por ellos y no los cambies en "corrected".` : ''}`;
 }
@@ -438,7 +447,9 @@ function normalizeFeedback(raw, sentence, settings = state.data.settings) {
   const finalVerdict = verdict === 'casi' && errors.length && !kept.length ? 'correcto' : verdict;
   const explanation = String(raw.explanation || '').split('\n').map(s => s.trim()).filter(Boolean).slice(0, 3).join('\n');
   const corrected = String(raw.corrected || sentence).trim();
-  return { verdict: finalVerdict, errors: kept, corrected, natural: String(raw.natural || corrected).trim(), explanation };
+  // Significado con el que se usó la palabra en la oración (puede no ser el que se estudia).
+  const sense = String(raw.sense || '').trim().replace(/\.$/, '');
+  return { verdict: finalVerdict, errors: kept, corrected, natural: String(raw.natural || corrected).trim(), explanation, sense, sameSense: raw.sameSense !== false || !sense };
 }
 
 async function evaluateSentence(w, sentence, settings = state.data.settings) {

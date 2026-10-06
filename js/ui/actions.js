@@ -280,6 +280,16 @@ const actions = {
     ex.phase = 'self';
     render();
   },
+  'save-sense': () => {
+    const ex = state.ui.session?.ex, w = curWord();
+    const sense = ex?.feedback?.sense;
+    if (!w || !sense || ex.senseSaved) return;
+    w.otherMeanings = [sense, ...(w.otherMeanings || []).filter(m => normalize(m) !== normalize(sense))].slice(0, 4);
+    ex.senseSaved = true;
+    persist();
+    toast(`«${sense}» se guardó como otro significado de «${w.word}»`);
+    render();
+  },
   'production-next': () => {
     const ex = state.ui.session?.ex, w = curWord();
     if (!w || ex.done || !ex.feedback) return;

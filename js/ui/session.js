@@ -428,6 +428,7 @@ function renderFeedback(w, ex) {
     <p class="sentence">${highlightErrors(ex.submitted, fb.errors)}</p>
   </div>
   ${banner(v.kind, v.title, sub)}
+  ${senseNote(w, ex)}
   ${n ? `<ul class="error-list">${fb.errors.map(e => `<li><s>${esc(e.fragment)}</s> → <b>${esc(e.correction)}</b>${e.explanation ? ` <span class="muted">· ${esc(e.explanation)}</span>` : ''}</li>`).join('')}</ul>` : ''}
   <div class="split-2">
     <div class="card stack-sm"><span class="eyebrow ok">Corregida</span><span class="sentence-md">${diffHighlight(ex.submitted, fb.corrected)}</span></div>
@@ -442,6 +443,18 @@ function renderFeedback(w, ex) {
     <button type="button" class="btn btn-primary" data-action="production-next" data-autofocus>Siguiente palabra</button>
   </div>
   <p class="hint">${outcome}</p>`;
+}
+
+// La usó con otro significado real (p. ej. «deslumbrar» cuando estudia «impresionar»):
+// se le dice y puede guardarlo en la palabra.
+function senseNote(w, ex) {
+  const fb = ex.feedback;
+  if (fb.sameSense || !fb.sense || fb.verdict === 'incorrecto') return '';
+  const known = [w.translation, ...(w.otherMeanings || [])].some(m => normalize(m).includes(normalize(fb.sense.replace(/\(.*?\)/g, ''))));
+  return banner('info', `Usaste «${esc(w.word)}» como «${esc(fb.sense)}»`,
+    `Es otro significado válido de la palabra. El que estás estudiando es «${esc(primaryMeaning(w) || w.translation || w.definition)}».`,
+    known || ex.senseSaved ? (ex.senseSaved ? '<span class="small" style="font-weight:600">Guardado en sus significados.</span>' : '')
+      : `<div class="actions"><button type="button" class="btn btn-secondary btn-sm" data-action="save-sense">${icon('plus', 16)}<span>Guardar este significado</span></button></div>`);
 }
 
 function renderSelfEval(w, ex) {
