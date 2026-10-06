@@ -18,27 +18,28 @@ const AI_PROVIDERS = {
   gemini: {
     name: 'Gemini', keySetting: 'apiKey', modelSetting: 'model',
     defaultModel: DEFAULT_MODEL, models: MODEL_SUGGESTIONS,
-    keyLabel: 'API key de Google Gemini', keyPlaceholder: 'API key de Google AI Studio',
+    keyLabel: 'clave de Google Gemini', keyPlaceholder: 'Clave de Google AI Studio',
     keyUrl: 'https://aistudio.google.com/apikey', keySite: 'Google AI Studio', keyOwner: 'Google',
   },
   deepseek: {
     name: 'DeepSeek', keySetting: 'deepseekKey', modelSetting: 'deepseekModel',
     defaultModel: DEEPSEEK_DEFAULT_MODEL, models: DEEPSEEK_MODEL_SUGGESTIONS,
-    keyLabel: 'API key de DeepSeek', keyPlaceholder: 'API key de DeepSeek (sk-…)',
+    keyLabel: 'clave de DeepSeek', keyPlaceholder: 'Clave de DeepSeek (sk-…)',
     keyUrl: 'https://platform.deepseek.com/api_keys', keySite: 'DeepSeek Platform', keyOwner: 'DeepSeek',
   },
   openai: {
     name: 'OpenAI', keySetting: 'openaiKey', modelSetting: 'openaiModel',
     defaultModel: OPENAI_DEFAULT_MODEL, models: OPENAI_MODEL_SUGGESTIONS,
-    keyLabel: 'API key de OpenAI', keyPlaceholder: 'API key de OpenAI (sk-…)',
+    keyLabel: 'clave de OpenAI', keyPlaceholder: 'Clave de OpenAI (sk-…)',
     keyUrl: 'https://platform.openai.com/api-keys', keySite: 'OpenAI Platform', keyOwner: 'OpenAI',
   },
 };
 const AI_TIMEOUT_MS = 60000;
 const ENRICH_BATCH = 15;           // palabras por petición de enriquecimiento (10-20)
 
-const STAGES = ['', 'Exposición', 'Reconocimiento', 'Recuerdo', 'Cloze', 'Producción'];
-const EXERCISES = { 1: 'Exposición', 2: 'Reconocimiento', 3: 'Recuerdo', 4: 'Cloze', 5: 'Producción', 6: 'Pronunciación', 7: 'Significado', 8: 'Rescate' };
+// Pasos por los que avanza cada palabra (nombres pensados para cualquiera, no para expertos).
+const STAGES = ['', 'Conocer', 'Reconocer', 'Recordar', 'En contexto', 'Usarla'];
+const EXERCISES = { 1: 'Conocer', 2: 'Reconocer', 3: 'Recordar', 4: 'En contexto', 5: 'Usarla', 6: 'Pronunciación', 7: 'Significado', 8: 'Rescate' };
 const MODES = { classic: 'Clásico', relaxed: 'Relajado', intensive: 'Intensivo', auto: 'Automático' };
 const LEECH_LAPSES = 5;            // fallos acumulados para marcar "leech"
 const MASTERED_INTERVAL = 21;      // modo clásico: días de intervalo para considerar una palabra dominada

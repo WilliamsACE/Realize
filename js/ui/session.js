@@ -64,7 +64,7 @@ function renderStudy(param) {
   const label = ex.optional ? 'Oración opcional'
     : ex.mode === 'relaxed' ? `Relajado · ${EXERCISES[ex.type]}`
     : ex.type === 6 || ex.type === 8 ? EXERCISES[ex.type]
-    : `${ex.mode === 'intensive' ? 'Intensivo · ' : ''}Etapa ${ex.type === 7 ? w.stage : ex.type} · ${EXERCISES[ex.type]}`;
+    : `${ex.mode === 'intensive' ? 'Intensivo · ' : ''}Paso ${ex.type === 7 ? w.stage : ex.type} de 5 · ${EXERCISES[ex.type]}`;
   return `
   <div class="study-head">
     <div class="row between">
@@ -145,7 +145,7 @@ function renderRecognition(w, ex) {
       action: 'choose', picked: ex.picked, chosen: answered ? ex.chosen : null, correct: ex.options.findIndex(o => o.correct),
     })}
     ${answered ? `
-      ${ex.result.ok ? banner('ok', '¡Correcto!', ex.mode === 'relaxed' ? 'Un acierto más para reconocerla al leer.' : 'La palabra avanza a Recuerdo.') : banner('err', `Significa «${esc(w.translation || right)}»`, 'Volverás a verla pronto.')}
+      ${ex.result.ok ? banner('ok', '¡Correcto!', ex.mode === 'relaxed' ? 'Un acierto más para reconocerla al leer.' : 'La palabra avanza al paso Recordar.') : banner('err', `Significa «${esc(w.translation || right)}»`, 'Volverás a verla pronto.')}
       <div class="card stack">${wordInfo(w, { examples: 1, family: false })}</div>
       ${actionBar(`${optionalSentenceBtn(ex)}<button type="button" class="btn btn-primary" data-action="next" data-autofocus>Continuar</button>`)}`
     : checkBar('confirm-choice', ex.picked)}
@@ -276,7 +276,7 @@ function renderRescue(w, ex) {
   const aidHTML = ex.loading ? '<span class="row gap-sm"><span class="spinner"></span><span class="muted">Buscando otra forma de recordarla…</span></span>'
     : aid ? `${aid.why ? `<p class="muted">${esc(aid.why)}</p>` : ''}${aid.mnemonic ? `<div class="tip">${esc(aid.mnemonic)}</div>` : ''}`
     : ex.error ? `${banner('err', 'No se pudo generar la ayuda', esc(ex.error))}<button type="button" class="btn btn-secondary btn-sm" style="align-self:flex-start" data-action="rescue-ai">Reintentar</button>`
-    : `${w.mnemonic ? `<div class="tip">${esc(w.mnemonic)}</div>` : ''}${hasKey() ? '' : '<p class="hint">Con la IA conectada recibirías un truco nuevo y las palabras con las que se confunde. <a href="#/ajustes">Configurar IA</a></p>'}`;
+    : `${w.mnemonic ? `<div class="tip">${esc(w.mnemonic)}</div>` : ''}${aiBanner('Con una IA conectada recibirías un truco nuevo para esta palabra y las palabras con las que se confunde.', { short: 'Te daría un truco nuevo para recordarla.' })}`;
   const contrast = buildContrast(w).length;
   return `
   <div class="stack-lg narrow">
@@ -376,7 +376,8 @@ function renderProduction(w, ex) {
         <button type="button" class="btn btn-secondary" data-action="self-eval" ${loading ? 'disabled' : ''}>Autoevaluar sin IA</button>
         ${ex.optional ? '<button type="button" class="btn-link" data-action="next-optional">Saltar</button>' : ''}
       </div>
-      <p class="hint">${hasKey() ? `Ctrl + Enter para enviar.${ignoredAspects().length ? ` No se corrigen ${ignoredAspects().map(x => x.split(' (')[0]).join(', ')} (<a href="#/ajustes">cambiar</a>).` : ''}` : 'Sin API key no hay retroalimentación automática. <a href="#/ajustes">Agrega tu API key (Gemini, DeepSeek u OpenAI)</a> o autoevalúate.'}</p>
+      ${hasKey() ? `<p class="hint">Ctrl + Enter para enviar.${ignoredAspects().length ? ` No se corrigen ${ignoredAspects().map(x => x.split(' (')[0]).join(', ')} (<a href="#/ajustes">cambiar</a>).` : ''}</p>`
+        : aiBanner('Con una IA conectada, tu oración se corrige al momento y te explica cómo mejorarla. Mientras, compárala tú con los ejemplos.', { short: 'Tu oración se corregiría al momento.' })}
     </form>`;
   }
   return `
@@ -472,11 +473,11 @@ function renderSummary(s) {
     return `
     <div class="card stack narrow">
       <h1 class="word-lg">¡Todo al día!</h1>
-      <p class="muted">No tienes palabras pendientes para hoy${s.segId ? ' en este segmento' : ''}${state.data.words.some(isNew) ? ' o ya alcanzaste tu meta de palabras nuevas' : ''}.</p>
+      <p class="muted">No tienes palabras pendientes para hoy${s.segId ? ' en esta lectura' : ''}${state.data.words.some(isNew) ? ' o ya alcanzaste tu meta de palabras nuevas' : ''}.</p>
       ${waiting && !isDismissed('studyWaiting', waiting) ? banner('warn', `${plural(waiting, 'palabra espera', 'palabras esperan')} su significado`, 'Enriquécelas con IA o complétalas a mano para estudiarlas.',
         '<div class="actions"><a class="btn btn-secondary btn-sm" href="#/palabras" data-action="filter-noai">Ver palabras</a></div>', 'studyWaiting', waiting) : ''}
       <div class="actions">
-        ${s.segId ? `<a class="btn btn-primary" href="#/segmento/${s.segId}">Volver al segmento</a>` : '<a class="btn btn-primary" href="#/lecturas">Preparar una lectura</a>'}
+        ${s.segId ? `<a class="btn btn-primary" href="#/segmento/${s.segId}">Volver a la lectura</a>` : '<a class="btn btn-primary" href="#/lecturas">Preparar una lectura</a>'}
         ${state.data.words.length ? `<button type="button" class="btn btn-secondary" data-action="force-session">Repasar de todas formas</button>` : ''}
         ${!s.segId && groups().some(canPractice) ? `<a class="btn btn-secondary" href="#/estudiar/grupos">${icon('cards', 18)}<span>Repasar grupos</span></a>` : ''}
       </div>
@@ -519,10 +520,10 @@ function renderSummary(s) {
       ${tile(s.done, 'Ejercicios')}${tile(s.stats.correct, 'Aciertos')}${tile(s.stats.wrong, 'Fallos')}
       ${tile(s.stats.newWords, 'Nuevas')}${tile(mins, 'Minutos')}${tile(currentStreak(state.data.stats), 'Días de racha')}
     </div>
-    ${q ? banner(quizScore(q) / q.questions.length >= 0.8 ? 'ok' : 'warn', `Minitest: ${quizScore(q)} de ${q.questions.length}`,
+    ${q ? banner(quizScore(q) / q.questions.length >= 0.8 ? 'ok' : 'warn', `Mini prueba: ${quizScore(q)} de ${q.questions.length}`,
       q.questions.filter(x => !x.ok).map(x => esc(x.w.word)).join(', ') ? `Repasa: ${q.questions.filter(x => !x.ok).map(x => esc(x.w.word)).join(', ')}` : 'Recordaste todas las palabras de la sesión.') : ''}
     <div class="actions">
-      ${s.segId ? `<a class="btn btn-primary" href="#/segmento/${s.segId}">Volver al segmento</a>` : '<a class="btn btn-primary" href="#/inicio">Volver al inicio</a>'}
+      ${s.segId ? `<a class="btn btn-primary" href="#/segmento/${s.segId}">Volver a la lectura</a>` : '<a class="btn btn-primary" href="#/inicio">Volver al inicio</a>'}
       ${pending ? `<button type="button" class="btn btn-secondary" data-action="start-session" ${s.segId ? `data-seg="${s.segId}"` : ''}>Otra ronda (${pending})</button>` : ''}
     </div>
   </div>`;
@@ -565,7 +566,7 @@ function renderQuiz(q) {
   <div class="study-head">
     <div class="row between">
       <span class="small" style="font-weight:600;color:var(--muted)">${esc(q.title)} · Pregunta ${q.pos + 1} de ${n}</span>
-      ${q.context === 'minitest' ? '<button type="button" class="btn-link" data-action="quiz-abort">Saltar minitest</button>' : '<button type="button" class="btn-link" data-action="quiz-abort">Salir</button>'}
+      ${q.context === 'minitest' ? '<button type="button" class="btn-link" data-action="quiz-abort">Saltar la mini prueba</button>' : '<button type="button" class="btn-link" data-action="quiz-abort">Salir</button>'}
     </div>
     <div class="progress"><div style="width:${Math.round((q.pos / n) * 100)}%"></div></div>
   </div>

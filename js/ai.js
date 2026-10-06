@@ -103,9 +103,9 @@ function httpError(status, payload, model, name) {
   const detail = msg + ' ' + JSON.stringify(payload?.error?.details || '');
   let err;
   if (status === 400 && /API_KEY_INVALID|API key not valid/i.test(detail)) {
-    err = new AIError('INVALID_KEY', 'La API key no es válida. Revísala en Ajustes.');
+    err = new AIError('INVALID_KEY', 'La clave de la IA no es válida. Revísala en Ajustes.');
   } else if (status === 401 || status === 403) {
-    err = new AIError('INVALID_KEY', `La API key no es válida o no tiene permiso para usar ${name}. Revísala en Ajustes.`);
+    err = new AIError('INVALID_KEY', `La clave de la IA no es válida o no tiene permiso para usar ${name}. Revísala en Ajustes.`);
   } else if (status === 402) {
     err = new AIError('BALANCE', `Tu cuenta de ${name} no tiene saldo suficiente. Recarga créditos e intenta de nuevo.`);
   } else if (status === 404 || /model not exist|model_not_found|does not exist/i.test(msg + ' ' + (payload?.error?.code || ''))) {
@@ -144,7 +144,7 @@ function parseJSONText(text, truncated) {
   if (a !== -1 && b > a) { try { return JSON.parse(cleaned.slice(a, b + 1)); } catch { /* inválido */ } }
   throw new AIError('BAD_JSON', truncated
     ? 'La respuesta de la IA se cortó antes de terminar. Prueba con menos palabras a la vez.'
-    : 'La IA devolvió una respuesta con formato inválido (JSON). Intenta de nuevo.');
+    : 'La IA devolvió una respuesta que no se pudo leer. Intenta de nuevo.');
 }
 
 const S = { type: 'STRING' };
@@ -263,11 +263,53 @@ async function fetchGroupDefs(words, type, settings = state.data.settings) {
   };
 }
 
+// Grupos que la IA propone a partir de tu lista (Mis palabras → Grupos).
+const SUGGEST_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    groups: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: { type: { type: 'STRING', format: 'enum', enum: ['meaning', 'spelling'] }, theme: S, words: SA, defs: SA },
+        required: ['type', 'theme', 'words', 'defs'],
+      },
+    },
+  },
+  required: ['groups'],
+};
+
+// words: [{ word, meaning }]; existing: listas de palabras de los grupos que ya tiene.
+function suggestPrompt(words, existing) {
+  return `A Spanish-speaking learner (B1-B2) is studying these English words (word — Spanish meaning):
+${words.map(w => `- ${w.word}${w.meaning ? ` — ${String(w.meaning).slice(0, 60)}` : ''}`).join('\n')}
+${existing.length ? `\nThey already practise these groups, do not repeat them: ${existing.map(g => g.join(', ')).join(' | ')}\n` : ''}
+Find groups of words FROM THIS LIST that are worth practising together because they are easy to mix up:
+- "meaning": 2-6 words that mean almost the same thing or share the same idea (e.g. bawl, blubber, sob → crying).
+- "spelling": 2-4 words that look or sound alike (e.g. dazzled, gazed).
+Return JSON: {"groups": [{"type", "theme", "words", "defs"}]} with at most 8 groups, the most useful first.
+- words: copied exactly from the list. Never add words that are not in the list. Each word in at most one group.
+- theme: for "meaning", the shared idea in Spanish, 1-3 lowercase words; for "spelling", an empty string.
+- defs: one very short English definition per word (max 8 words), in the same order as "words", showing what makes it different from the others. Never use the word itself.
+Only include groups that really help; return {"groups": []} if there are none.`;
+}
+
+async function fetchGroupSuggestions(words, existing, settings = state.data.settings) {
+  const raw = await callAI({ system: ENRICH_SYSTEM, prompt: suggestPrompt(words, existing), schema: SUGGEST_SCHEMA }, settings);
+  const str = v => String(v ?? '').trim().replace(/\.$/, '');
+  return (Array.isArray(raw?.groups) ? raw.groups : []).map(g => ({
+    type: g?.type === 'spelling' ? 'spelling' : 'meaning',
+    theme: str(g?.theme),
+    words: (Array.isArray(g?.words) ? g.words : []).map(str).filter(Boolean),
+    defs: (Array.isArray(g?.defs) ? g.defs : []).map(str),
+  }));
+}
+
 async function enrichWords(list, settings = state.data.settings) {
   const items = list.map(it => (typeof it === 'string' ? { word: it } : it));
   const raw = await callAI({ system: ENRICH_SYSTEM, prompt: enrichPrompt(items), schema: ENRICH_SCHEMA }, settings);
   const out = Array.isArray(raw?.items) ? raw.items : Array.isArray(raw) ? raw : null;
-  if (!out) throw new AIError('BAD_JSON', 'La IA devolvió un JSON sin la lista de palabras esperada. Intenta de nuevo.');
+  if (!out) throw new AIError('BAD_JSON', 'La IA devolvió una respuesta sin la lista de palabras. Intenta de nuevo.');
   // Empareja cada palabra pedida con su resultado: primero por texto, luego por posición.
   return items.map((it, i) => {
     const match = out.find(o => normalize(o?.word) === normalize(it.word)) || out[i];
@@ -382,7 +424,7 @@ IMPORTANTE: el estudiante pidió ignorar ${ignored.join('; ')}. No los cuentes c
 }
 
 function normalizeFeedback(raw, sentence, settings = state.data.settings) {
-  if (!raw || typeof raw !== 'object') throw new AIError('BAD_JSON', 'La IA devolvió una respuesta con formato inválido. Intenta de nuevo.');
+  if (!raw || typeof raw !== 'object') throw new AIError('BAD_JSON', 'La IA devolvió una respuesta que no se pudo leer. Intenta de nuevo.');
   const v = normalize(raw.verdict);
   const verdict = /^(correcto|correct)$/.test(v) ? 'correcto' : /^(casi|almost|nearly)/.test(v) ? 'casi' : /incorrect/.test(v) ? 'incorrecto' : null;
   if (!verdict) throw new AIError('BAD_JSON', 'La IA no indicó un veredicto válido. Intenta de nuevo.');

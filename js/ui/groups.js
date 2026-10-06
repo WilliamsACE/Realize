@@ -138,6 +138,74 @@ function spellingQuestions(ws, max = 12) {
   return shuffle(qs).slice(0, max);
 }
 
+/* ---------- Grupos sugeridos por la IA ---------- */
+
+const SUGGEST_MIN_WORDS = 4;
+const SUGGEST_MAX_WORDS = 300;   // las más recientes, para que la petición no sea enorme
+
+// Pide grupos a la IA y se queda solo con los que usan palabras reales de tu lista y aún no tienes.
+async function runGroupSuggestions() {
+  const ai = (state.ui.aiSuggest ||= { busy: false, error: null, list: null });
+  if (ai.busy) return;
+  const pool = state.data.words.filter(isStudyReady).slice(-SUGGEST_MAX_WORDS);
+  ai.busy = true;
+  ai.error = null;
+  refreshIfOn('grupos');
+  try {
+    const raw = await fetchGroupSuggestions(pool.map(w => ({ word: w.word, meaning: primaryMeaning(w) || w.definition })), groups().map(g => groupWords(g).map(w => w.word)));
+    const byWord = new Map(pool.map(w => [normalize(w.word), w]));
+    const taken = new Set();   // cada palabra, en una sola sugerencia
+    ai.list = [];
+    for (const g of raw) {
+      const ids = [], defs = {};
+      g.words.forEach((text, i) => {
+        const w = byWord.get(normalize(text));   // la IA no puede inventar palabras: solo valen las de tu lista
+        if (!w || taken.has(w.id) || ids.includes(w.id)) return;
+        ids.push(w.id);
+        if (g.defs[i]) defs[w.id] = g.defs[i];
+      });
+      const pick = ids.slice(0, typeOf(g.type).max);
+      if (pick.length < 2 || groups().some(x => pick.every(id => x.ids.includes(id)))) continue;   // ya lo tienes
+      pick.forEach(id => taken.add(id));
+      ai.list.push({ type: g.type, theme: g.theme, ids: pick, defs });
+    }
+  } catch (e) {
+    ai.error = errorText(e);
+  }
+  ai.busy = false;
+  refreshIfOn('grupos');
+}
+
+function aiSuggestCard() {
+  const ai = state.ui.aiSuggest || {};
+  const ready = state.data.words.filter(isStudyReady).length;
+  const head = `<div class="row nowrap"><span class="icon-tile">${icon('sparkle')}</span>
+      <div class="stack-xs grow"><h2>Grupos sugeridos por la IA</h2><span class="hint">Revisa tu lista y te propone palabras que conviene practicar juntas.</span></div></div>`;
+  let body;
+  if (!hasKey()) body = aiBanner('Con una IA conectada, revisaría tus palabras y te propondría grupos, como «bawl, blubber y sob» (llorar).', { force: true, short: 'Te propondría grupos con tus palabras.' });
+  else if (ready < SUGGEST_MIN_WORDS) body = `<p class="hint">Necesitas al menos ${SUGGEST_MIN_WORDS} palabras con significado para recibir sugerencias.</p>`;
+  else if (ai.busy) body = `<div class="sugg-loading" aria-live="polite"><span class="row gap-sm"><span class="spinner"></span><span class="muted small">Revisando tus ${plural(Math.min(ready, SUGGEST_MAX_WORDS), 'palabra', 'palabras')}…</span></span>
+      ${'<span class="sugg-skeleton"></span>'.repeat(3)}</div>`;
+  else {
+    const list = ai.list || [];
+    body = `${ai.error ? banner('err', 'No se pudieron buscar grupos', esc(ai.error)) : ''}
+      ${list.map((g, i) => {
+        const ws = g.ids.map(findWord).filter(Boolean);
+        return `<div class="sugg t-${g.type}" style="--i:${i}">
+          <div class="row between nowrap">${typeBadge(g.type)}${g.theme ? `<b class="sugg-theme">${esc(cap(g.theme))}</b>` : ''}</div>
+          <div class="sugg-words">${ws.map(w => `<div><b>${esc(w.word)}</b><span>${esc(g.defs[w.id] || primaryMeaning(w) || '')}</span></div>`).join('')}</div>
+          <div class="actions">
+            <button type="button" class="btn btn-primary btn-sm" data-action="sugg-accept" data-idx="${i}">${icon('plus', 16)}<span>Crear grupo</span></button>
+            <button type="button" class="btn-link" data-action="sugg-skip" data-idx="${i}">Descartar</button>
+          </div>
+        </div>`;
+      }).join('')}
+      ${ai.list && !list.length && !ai.error ? '<p class="hint">No hay más sugerencias por ahora. Agrega más palabras y vuelve a buscar.</p>' : ''}
+      <button type="button" class="btn ${ai.list ? 'btn-secondary' : 'btn-primary'} btn-sm" style="align-self:flex-start" data-action="sugg-run">${icon('sparkle', 16)}<span>${ai.list ? 'Buscar otra vez' : 'Buscar grupos en mis palabras'}</span></button>`;
+  }
+  return `<section class="card stack ai-sugg">${head}${body}</section>`;
+}
+
 /* ---------- Piezas de vista ---------- */
 
 const typeBadge = (type, text = typeOf(type).label) => `<span class="type-badge t-${type}">${icon(typeOf(type).icon, 14)}<span>${text}</span></span>`;
@@ -270,9 +338,9 @@ function renderAddGroup() {
         ${busy ? '<span class="spinner"></span>' : icon('sparkle')}<span>${busy ? 'Creando el grupo…' : 'Crear con IA'}</span>
       </button>
       <button type="button" class="btn btn-secondary btn-block" data-action="gd-manual" ${busy ? 'disabled' : ''}>Escribir las definiciones a mano</button>
-      ${!hasKey() ? inlineKeyCard() : ''}
     </div>
     <div class="col-preview stack">
+      ${aiBanner('Con una IA conectada, el grupo se arma solo: completa las palabras nuevas, sugiere el tema y escribe una definición corta para cada una.', { force: d.needAi, short: 'El grupo se arma solo, con sus definiciones.' })}
       ${d.error ? banner('err', 'No se pudo completar con IA', esc(d.error), '', true) : ''}
       ${right}
     </div>
@@ -359,14 +427,15 @@ function renderGroups() {
         : `<div class="card card-dashed">${icon('cards', 28)}<b>Aún no tienes grupos</b><span class="small">Crea uno con palabras que se parezcan en significado o en escritura.</span>
             <a class="btn btn-primary btn-sm" style="margin-top:10px" href="#/agregar/grupo">${icon('plus', 16)}<span>Crear un grupo</span></a></div>`}
     </div>
-    ${sugg.length ? `<div class="col-side stack-lg">
-      <section class="card stack-sm">
+    <div class="col-side stack-lg">
+      ${aiSuggestCard()}
+      ${sugg.length ? `<section class="card stack-sm">
         <h2>Se escriben parecido en tu lista</h2>
         <span class="hint">Palabras de tu lista que se suelen confundir.</span>
         ${sugg.map(({ a, b }) => `<div class="row between sim-sugg"><span><b>${esc(a.word)}</b> <span class="sim-vs">vs</span> <b>${esc(b.word)}</b></span>
           <button type="button" class="btn btn-secondary btn-sm" data-action="group-suggest" data-ids="${esc(a.id)}|${esc(b.id)}">Crear grupo</button></div>`).join('')}
-      </section>
-    </div>` : ''}
+      </section>` : ''}
+    </div>
   </div>`;
 }
 
@@ -651,7 +720,7 @@ Object.assign(actions, {
     const items = parseGroupLines(d);
     if (!items) return;
     if (!hasKey()) {
-      d.error = `Falta la ${aiProvider().keyLabel}. Pégala abajo o en Ajustes, o escribe las definiciones a mano.`;
+      d.needAi = true;   // muestra el aviso de conectar la IA aunque se haya cerrado
       render();
       return;
     }
@@ -788,6 +857,21 @@ Object.assign(actions, {
     }
     ed.busy = false;
     if (state.ui.groupEdit === ed) refreshIfOn('grupos');
+  },
+  'sugg-run': () => runGroupSuggestions(),
+  'sugg-accept': el => {
+    const ai = state.ui.aiSuggest;
+    const g = ai?.list?.[Number(el.dataset.idx)];
+    if (!g) return;
+    const ids = g.ids.filter(id => findWord(id));
+    if (ids.length >= 2) addGroup({ type: g.type, name: g.theme, ids, defs: g.defs });
+    ai.list.splice(Number(el.dataset.idx), 1);
+    toast(`Grupo ${g.theme ? `«${cap(g.theme)}» ` : ''}creado`);
+    render();
+  },
+  'sugg-skip': el => {
+    state.ui.aiSuggest?.list?.splice(Number(el.dataset.idx), 1);
+    render();
   },
   'group-suggest': el => {
     addGroup({ type: 'spelling', ids: el.dataset.ids.split('|') });

@@ -6,7 +6,7 @@
    - GitHub y las API de IA nunca pasan por aquí: van siempre a la red.
    Si agregas un archivo .js a index.html, agrégalo también a SHELL. */
 
-const CACHE = 'realize-v1';
+const CACHE = 'realize-v2';
 const SHELL = [
   './',
   'index.html',
@@ -36,7 +36,9 @@ const SHELL = [
   'js/ui/events.js',
   'js/ui/groups.js',
   'js/reading.js',
-  'js/sync.js'
+  'js/sync.js',
+  'js/history.js',
+  'js/ui/welcome.js'
 ];
 const CDN = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsdelivr.net'];
 

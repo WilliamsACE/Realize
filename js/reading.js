@@ -675,7 +675,7 @@ function createSegment(bs) {
   const id = uid();
   const candidates = p.analysis.cands.filter(c => !knownRecord(c.lemma)).map(c => ({ ...c, status: studyWordFor(idx, c.lemma) ? 'studying' : 'pending' }));
   const seg = {
-    id, bookId: bs.book.id, title: (bs.title || '').trim() || p.title || 'Segmento', createdAt: Date.now(),
+    id, bookId: bs.book.id, title: (bs.title || '').trim() || p.title || 'Lectura', createdAt: Date.now(),
     sel: { ...bs.sel, fragment: bs.sel.fragment ? '(fragmento)' : '' }, mode: bs.mode,
     wordCount: p.analysis.wordCount, totalTokens: p.analysis.totalTokens, baseKnown: p.analysis.baseKnown, rare: p.analysis.rare,
     candidates, history: [], tests: [], autoTop: [],
@@ -771,7 +771,7 @@ const FORMAT_LABEL = { pdf: 'PDF', epub: 'EPUB', docx: 'DOCX', txt: 'TXT', paste
 const KIND_UNIT = { pages: ['página', 'páginas'], chapters: ['capítulo', 'capítulos'], sections: ['sección', 'secciones'], plain: ['texto', 'textos'] };
 const MODE_INFO = {
   relaxed: { title: 'Relajado', text: 'Reconocer la palabra al leer. Tarjeta, opción múltiple y a veces escribirla. 5–10 min.' },
-  intensive: { title: 'Intensivo', text: 'Dominar y usar la palabra: pasos de aprendizaje, cloze con el libro, oración con IA y minitest.' },
+  intensive: { title: 'Intensivo', text: 'Dominar y usar la palabra: repasos seguidos, completar oraciones del libro, escribir tus propias oraciones y una mini prueba.' },
   auto: { title: 'Automático', text: `Intensivo para las ${AUTO_INTENSIVE_TOP} palabras más frecuentes y relajado para el resto.` },
 };
 
@@ -833,8 +833,8 @@ function renderLibrary() {
           <span class="seg-cov">${p >= state.data.settings.coverageTarget ? '<span class="chip chip-ok">Listo para leer</span>' : ''}<b>${fmtPct(p)}</b></span>
           <span class="seg-bar">${coverageBar(s, { compact: true })}</span>
         </a>`;
-      }).join('') || '<p class="muted small">Aún no hay segmentos. Elige qué parte vas a leer.</p>'}
-      <div class="actions"><a class="btn btn-secondary btn-sm" href="#/libro/${b.id}">${icon('plus', 18)}<span>Nuevo segmento</span></a></div>
+      }).join('') || '<p class="muted small">Aún no hay lecturas. Elige qué parte vas a leer.</p>'}
+      <div class="actions"><a class="btn btn-secondary btn-sm" href="#/libro/${b.id}">${icon('plus', 18)}<span>Nueva lectura</span></a></div>
     </section>`;
   }).join('')}`;
 }
@@ -869,7 +869,7 @@ function unitList(bs) {
 function previewPanel(bs) {
   if (bs.busy) return `<div class="card stack-sm"><span class="row gap-sm"><span class="spinner"></span><b>Analizando el texto…</b></span></div>`;
   const p = bs.preview;
-  if (!p) return `<div class="card card-dashed">${icon('book', 28)}<b>Vista previa del segmento</b><span class="small">Elige la parte que vas a leer y pulsa «Analizar».</span></div>`;
+  if (!p) return `<div class="card card-dashed">${icon('book', 28)}<b>Vista previa de la lectura</b><span class="small">Elige la parte que vas a leer y pulsa «Analizar».</span></div>`;
   const a = p.analysis;
   const cands = a.cands.filter(c => !knownRecord(c.lemma));
   const phrases = cands.filter(c => c.phrase);
@@ -880,11 +880,11 @@ function previewPanel(bs) {
   const half = Math.round(cands.length / 2);
   const tile = (n, label) => `<div class="stat" style="background:var(--surface-2)"><b>${n}</b><span>${label}</span></div>`;
   return `<div class="card stack">
-    <h2>Vista previa del segmento</h2>
+    <h2>Vista previa de la lectura</h2>
     <div class="stat-grid" style="flex:none">
-      ${tile(fmtNum(a.wordCount), 'Palabras totales')}${tile(fmtNum(cands.length), 'Candidatas')}${tile(fmtPct(cov), 'Ya conoces')}
+      ${tile(fmtNum(a.wordCount), 'Palabras totales')}${tile(fmtNum(cands.length), 'Palabras del texto')}${tile(fmtPct(cov), 'Ya conoces')}
     </div>
-    <div class="kv"><span>Triage</span><b>~${triageMin} min</b></div>
+    <div class="kv"><span>Revisar palabras</span><b>~${triageMin} min</b></div>
     <div class="kv"><span>Estudio relajado</span><b>~${Math.round(half * 1.5)} min</b></div>
     <div class="kv"><span>Estudio intensivo</span><b>~${Math.round(half * 4)} min</b></div>
     <span class="hint">Estimado si no conoces la mitad de las candidatas (~${half}), repartido en varios días.</span>
@@ -893,7 +893,7 @@ function previewPanel(bs) {
     ${phrases.length ? `<div class="stack-xs"><span class="eyebrow">Expresiones y phrasal verbs (${phrases.length})</span><div class="chips">${phrases.slice(0, 12).map(c => `<span class="chip chip-accent">${esc(c.lemma)} ×${c.freq}</span>`).join('')}</div></div>` : ''}
     <span class="label">Modo de aprendizaje</span>
     ${modePicker(bs.mode, 'set-draft-mode')}
-    <div class="actions"><button type="button" class="btn btn-primary" data-action="create-segment">Crear segmento</button></div>
+    <div class="actions"><button type="button" class="btn btn-primary" data-action="create-segment">Crear lectura</button></div>
   </div>`;
 }
 
@@ -938,12 +938,12 @@ function renderBook(id) {
     <div class="card stack col-main">
       <h2>¿Qué parte vas a leer?</h2>
       ${chooser}
-      <div class="field"><label class="label" for="sel-title">Nombre del segmento</label><input id="sel-title" class="input" data-bind="sel-title" value="${esc(bs.title)}" placeholder="${esc(auto || 'Capítulo 1')}" autocomplete="off"></div>
+      <div class="field"><label class="label" for="sel-title">Nombre de la lectura</label><input id="sel-title" class="input" data-bind="sel-title" value="${esc(bs.title)}" placeholder="${esc(auto || 'Capítulo 1')}" autocomplete="off"></div>
       <div class="actions"><button type="button" class="btn btn-primary" data-action="analyze">${icon('book')}<span>Analizar</span></button></div>
     </div>
     <div class="col-side stack">
       <div id="seg-preview">${previewPanel(bs)}</div>
-      ${segs.length ? `<div class="card stack-sm"><h2>Segmentos de este libro</h2>${segs.map(s => `<a class="seg-row" href="#/segmento/${s.id}"><span class="grow"><b>${esc(s.title)}</b></span><b>${fmtPct(segmentCoverage(s))}</b></a>`).join('')}</div>` : ''}
+      ${segs.length ? `<div class="card stack-sm"><h2>Lecturas de este libro</h2>${segs.map(s => `<a class="seg-row" href="#/segmento/${s.id}"><span class="grow"><b>${esc(s.title)}</b></span><b>${fmtPct(segmentCoverage(s))}</b></a>`).join('')}</div>` : ''}
     </div>
   </div>`;
 }
@@ -952,7 +952,7 @@ function renderBook(id) {
 
 function renderSegment(id) {
   const seg = segmentById(id);
-  if (!seg) return `<div class="page-head"><h1>Segmento no encontrado</h1></div><a class="btn btn-secondary" href="#/lecturas">Volver a Lecturas</a>`;
+  if (!seg) return `<div class="page-head"><h1>Lectura no encontrada</h1></div><a class="btn btn-secondary" href="#/lecturas">Volver a Lecturas</a>`;
   const st = segmentStats(seg);
   const prepCount = segWords(seg).filter(w => isStudyReady(w) && !isMastered(w)).length;   // «Estudiar todas»
   const hardCount = hardIds(seg).length;
@@ -967,7 +967,7 @@ function renderSegment(id) {
     <span class="muted small">${fmtNum(seg.wordCount)} palabras · ${MODE_INFO[seg.mode].title}</span></div>
 
   <div class="card stack coverage-card ${ready ? 'is-ready' : ''}">
-    <span class="eyebrow">Cobertura de lectura</span>
+    <span class="eyebrow">Comprensión del texto</span>
     <div class="row between baseline"><span class="coverage-text">Ya conoces el <b>${fmtPct(p)}</b> de las palabras de este texto</span>
       ${ready ? `<span class="chip chip-ok">${icon('check', 16)} Listo para leer</span>` : `<span class="chip">Objetivo ${target}%</span>`}</div>
     ${coverageBar(seg)}
@@ -975,7 +975,7 @@ function renderSegment(id) {
   </div>
 
   <div class="stat-grid seg-stats">
-    ${tile(st.total, 'Candidatas')}${tile(st.pending, 'Sin revisar')}${tile(st.known, 'La sé')}
+    ${tile(st.total, 'Palabras del texto')}${tile(st.pending, 'Sin revisar')}${tile(st.known, 'La sé')}
     ${tile(st.familiar, 'Me suenan')}${tile(st.unknown + st.studying, 'No la sé / en estudio')}${tile(st.learned, 'Aprendidas', 'ok')}
   </div>
 
@@ -983,17 +983,17 @@ function renderSegment(id) {
     <div class="col-main stack">
       <div class="card step-row">
         <span class="step-num">1</span>
-        <div class="stack-xs grow"><b>Triage</b><span class="hint">${st.pending ? `${plural(st.pending, 'palabra por revisar', 'palabras por revisar')}, de la más frecuente a la menos.` : 'Revisaste todas las palabras candidatas.'}</span></div>
+        <div class="stack-xs grow"><b>Revisar palabras</b><span class="hint">${st.pending ? `${plural(st.pending, 'palabra por revisar', 'palabras por revisar')}, de la más frecuente a la menos.` : 'Revisaste todas las palabras candidatas.'}</span></div>
         <a class="btn ${st.pending ? 'btn-primary' : 'btn-secondary'} btn-sm" href="#/triage/${seg.id}">${st.pending ? (seg.history.length ? 'Continuar' : 'Empezar') : 'Ver resumen'}</a>
       </div>
       <div class="card step-row">
         <span class="step-num">2</span>
         <div class="stack-xs grow"><b>Significados con IA</b><span class="hint">${st.waiting ? `${plural(st.waiting, 'palabra espera', 'palabras esperan')} su significado (en tandas de ${ENRICH_BATCH}; usa la oración del libro para elegir el sentido).` : 'Todas las palabras en estudio tienen significado.'}</span></div>
-        ${st.waiting ? (hasKey() ? `<button type="button" class="btn btn-dark btn-sm" data-action="enrich-seg" data-seg="${seg.id}" ${busy ? 'disabled' : ''}>${busy ? `<span class="spinner"></span><span>${esc(busy)}</span>` : `${icon('sparkle', 18)}<span>Enriquecer</span>`}</button>` : '<a class="btn btn-secondary btn-sm" href="#/ajustes">Agregar API key</a>') : ''}
+        ${st.waiting ? (hasKey() ? `<button type="button" class="btn btn-dark btn-sm" data-action="enrich-seg" data-seg="${seg.id}" ${busy ? 'disabled' : ''}>${busy ? `<span class="spinner"></span><span>${esc(busy)}</span>` : `${icon('sparkle', 18)}<span>Enriquecer</span>`}</button>` : `<a class="btn btn-secondary btn-sm" href="#/ajustes">${icon('sparkle', 16)}<span>Conectar IA</span></a>`) : ''}
       </div>
       <div class="card step-row">
         <span class="step-num">3</span>
-        <div class="stack-xs grow"><b>Estudiar</b>${st.ready ? '' : '<span class="hint">Primero haz el triage y completa los significados.</span>'}</div>
+        <div class="stack-xs grow"><b>Estudiar</b>${st.ready ? '' : '<span class="hint">Primero revisa las palabras y completa los significados.</span>'}</div>
         ${st.ready ? `<div class="study-options">
           <div class="study-option">
             <div class="stack-xs grow"><b>Lo de hoy</b><span class="hint">${st.due} para repasar · ${st.fresh} nuevas (máx. ${dailyLimit(seg.mode === 'intensive' ? 'intensive' : 'relaxed')}/día)</span></div>
@@ -1011,7 +1011,7 @@ function renderSegment(id) {
       </div>
       <div class="card step-row">
         <span class="step-num">4</span>
-        <div class="stack-xs grow"><b>Prueba final del segmento</b><span class="hint">${lastTest ? `Último resultado: ${Math.round((lastTest.score / lastTest.total) * 100)}% (${lastTest.score}/${lastTest.total}) · ${new Date(lastTest.at).toLocaleDateString('es')}` : 'Examen mezclado con todas las palabras en estudio del segmento.'}</span></div>
+        <div class="stack-xs grow"><b>Prueba final de la lectura</b><span class="hint">${lastTest ? `Último resultado: ${Math.round((lastTest.score / lastTest.total) * 100)}% (${lastTest.score}/${lastTest.total}) · ${new Date(lastTest.at).toLocaleDateString('es')}` : 'Examen mezclado con todas las palabras en estudio del segmento.'}</span></div>
         <a class="btn btn-secondary btn-sm ${st.ready >= 3 ? '' : 'disabled'}" href="${st.ready >= 3 ? `#/prueba/${seg.id}` : '#/segmento/' + seg.id}" ${st.ready >= 3 ? '' : 'aria-disabled="true"'}>Hacer prueba</a>
       </div>
     </div>
@@ -1028,7 +1028,7 @@ function renderSegment(id) {
           <a class="btn btn-secondary btn-sm" href="#/glosario/${seg.id}">${icon('list', 18)}<span>Glosario</span></a>
           <button type="button" class="btn btn-secondary btn-sm" data-action="export-csv-seg" data-seg="${seg.id}">${icon('download', 18)}<span>CSV para Anki</span></button>
         </div>
-        <button type="button" class="btn-link danger" style="align-self:flex-start" data-action="delete-segment" data-seg="${seg.id}">Borrar segmento</button>
+        <button type="button" class="btn-link danger" style="align-self:flex-start" data-action="delete-segment" data-seg="${seg.id}">Borrar lectura</button>
       </div>
     </div>
   </div>`;
@@ -1038,7 +1038,7 @@ function renderSegment(id) {
 
 function renderTriage(id) {
   const seg = segmentById(id);
-  if (!seg) return `<div class="page-head"><h1>Segmento no encontrado</h1></div>`;
+  if (!seg) return `<div class="page-head"><h1>Lectura no encontrada</h1></div>`;
   const idx = studyIndex();
   const cand = nextPending(seg, idx);
   const total = seg.candidates.length;
@@ -1049,7 +1049,7 @@ function renderTriage(id) {
   return `
   <div class="study-head">
     <div class="row between">
-      <span class="small" style="font-weight:600;color:var(--muted)">${esc(seg.title)} · Triage · ${reviewed + 1} de ${total}</span>
+      <span class="small" style="font-weight:600;color:var(--muted)">${esc(seg.title)} · Revisar palabras · ${reviewed + 1} de ${total}</span>
       <span class="actions">
         ${seg.history.length ? '<button type="button" class="btn-link" data-action="triage-undo">Deshacer</button>' : ''}
         <a class="btn-link" href="#/segmento/${seg.id}">Pausar</a>
@@ -1070,7 +1070,7 @@ function renderTriage(id) {
       <button type="button" class="tbtn tbtn-familiar" data-action="triage-decide" data-decision="familiar"><span class="key">2</span><b>Me suena</b></button>
       <button type="button" class="tbtn tbtn-unknown" data-action="triage-decide" data-decision="unknown"><span class="key">3</span><b>No la sé</b></button>
     </div>
-    <p class="hint">Atajos: 1, 2 y 3 · Z para deshacer. «Me suena» empieza en reconocimiento; «No la sé» empieza con la tarjeta completa.</p>
+    <p class="hint">Atajos: 1, 2 y 3 · Z para deshacer. «Me suena» se salta la presentación de la palabra; «No la sé» empieza desde el principio.</p>
   </div>`;
 }
 
@@ -1082,15 +1082,15 @@ function renderTriageSummary(seg) {
   const canVerify = state.data.settings.verifyKnown && c.known >= 3;
   return `
   <div class="card stack-lg narrow">
-    <div class="stack-xs"><span class="eyebrow">${esc(seg.title)} · Triage terminado</span><h1 class="word-lg">Resumen</h1></div>
+    <div class="stack-xs"><span class="eyebrow">${esc(seg.title)} · Revisión terminada</span><h1 class="word-lg">Resumen</h1></div>
     <p class="lead">De ${plural(total, 'palabra', 'palabras')}: <b>${c.known}</b> las sabes, <b>${c.familiar}</b> te suenan y <b>${c.unknown}</b> no las sabes${c.studying ? ` (${c.studying} ya estaban en estudio)` : ''}.</p>
-    <div class="coverage-mini row between"><span>Cobertura actual</span><b>${fmtPct(segmentCoverage(seg))}</b></div>
+    <div class="coverage-mini row between"><span>Comprensión actual</span><b>${fmtPct(segmentCoverage(seg))}</b></div>
     ${canVerify && !isDismissed(`verify-${seg.id}`) ? banner('info', '¿Seguro que las sabes?', `Comprueba una muestra de ${Math.min(10, c.known)} palabras con opción múltiple. Las que falles pasarán a estudio.`,
-      `<div class="actions">${hasKey() ? `<a class="btn btn-primary btn-sm" href="#/verificar/${seg.id}">Verificar una muestra</a>` : '<a class="btn btn-secondary btn-sm" href="#/ajustes">Necesita API key</a>'}</div>`, `verify-${seg.id}`) : ''}
+      `<div class="actions">${hasKey() ? `<a class="btn btn-primary btn-sm" href="#/verificar/${seg.id}">Verificar una muestra</a>` : `<a class="btn btn-secondary btn-sm" href="#/ajustes">${icon('sparkle', 16)}<span>Conectar IA para verificar</span></a>`}</div>`, `verify-${seg.id}`) : ''}
     ${st.waiting && !isDismissed(`segWaiting-${seg.id}`, st.waiting) ? banner('warn', `${plural(st.waiting, 'palabra espera', 'palabras esperan')} su significado`, 'Enriquécelas con IA para poder estudiarlas.',
       hasKey() ? `<div class="actions"><button type="button" class="btn btn-dark btn-sm" data-action="enrich-seg" data-seg="${seg.id}" ${state.ui.enrichBusy ? 'disabled' : ''}>${state.ui.enrichBusy ? `<span class="spinner"></span><span>${esc(state.ui.enrichBusy)}</span>` : 'Enriquecer con IA'}</button></div>` : '', `segWaiting-${seg.id}`, st.waiting) : ''}
     <div class="actions">
-      <a class="btn btn-primary" href="#/segmento/${seg.id}">Ir al segmento</a>
+      <a class="btn btn-primary" href="#/segmento/${seg.id}">Ir a la lectura</a>
       ${seg.history.length ? '<button type="button" class="btn btn-secondary" data-action="triage-undo">Deshacer la última</button>' : ''}
     </div>
   </div>`;
@@ -1131,10 +1131,10 @@ function glossaryRows(seg) {
 
 function renderGlossary(id) {
   const seg = segmentById(id);
-  if (!seg) return `<div class="page-head"><h1>Segmento no encontrado</h1></div>`;
+  if (!seg) return `<div class="page-head"><h1>Lectura no encontrada</h1></div>`;
   return `
   <div class="row between">
-    <div class="page-head"><a class="btn-link" style="align-self:flex-start;padding-left:0" href="#/segmento/${seg.id}">← ${esc(seg.title)}</a><h1>Glosario del segmento</h1></div>
+    <div class="page-head"><a class="btn-link" style="align-self:flex-start;padding-left:0" href="#/segmento/${seg.id}">← ${esc(seg.title)}</a><h1>Glosario de la lectura</h1></div>
     <button type="button" class="btn btn-secondary btn-sm" data-action="export-csv-seg" data-seg="${seg.id}">${icon('download', 18)}<span>CSV para Anki</span></button>
   </div>
   <div class="toolbar">
@@ -1167,7 +1167,7 @@ function renderCapture() {
         : '<p class="muted small">Escribe cada palabra desconocida sin detenerte a buscarla. Después la IA las completa todas juntas.</p>'}
     </div>
     ${caps.length ? `<div class="actions">
-      ${hasKey() ? `<button type="button" class="btn btn-dark" data-action="process-captures" data-ai="1" ${busy ? 'disabled' : ''}>${busy ? `<span class="spinner"></span><span>${esc(busy)}</span>` : `${icon('sparkle', 18)}<span>Enriquecer y estudiar (${caps.length})</span>`}</button>` : '<a class="btn btn-secondary" href="#/ajustes">Agregar API key para enriquecer</a>'}
+      ${hasKey() ? `<button type="button" class="btn btn-dark" data-action="process-captures" data-ai="1" ${busy ? 'disabled' : ''}>${busy ? `<span class="spinner"></span><span>${esc(busy)}</span>` : `${icon('sparkle', 18)}<span>Enriquecer y estudiar (${caps.length})</span>`}</button>` : `<a class="btn btn-secondary" href="#/ajustes">${icon('sparkle', 18)}<span>Conectar IA para completarlas</span></a>`}
       <button type="button" class="btn-link" data-action="process-captures" data-ai="0" ${busy ? 'disabled' : ''}>Pasar a Mis palabras sin IA</button>
     </div>` : ''}
   </div>`;
@@ -1177,7 +1177,7 @@ function renderCapture() {
 
 function renderTestRoute(id) {
   const q = state.ui.quiz;
-  if (state.ui.quizInfo?.error) return `<div class="card stack narrow">${banner('warn', 'No se puede hacer la prueba', esc(state.ui.quizInfo.error))}<a class="btn btn-secondary" href="#/segmento/${id}">Volver al segmento</a></div>`;
+  if (state.ui.quizInfo?.error) return `<div class="card stack narrow">${banner('warn', 'No se puede hacer la prueba', esc(state.ui.quizInfo.error))}<a class="btn btn-secondary" href="#/segmento/${id}">Volver a la lectura</a></div>`;
   return q ? renderQuiz(q) : '';
 }
 function renderVerifyRoute(id) {
@@ -1195,7 +1195,7 @@ QUIZ_DONE.final = q => {
   libSaveSegment(seg);
 };
 QUIZ_RESULT.final = q => quizResultCard(q, 'Resultado de la prueba', `
-  <div class="actions"><a class="btn btn-primary" href="#/segmento/${q.segId}">Volver al segmento</a><button type="button" class="btn btn-secondary" data-action="retry-final" data-seg="${q.segId}">Repetir prueba</button></div>`);
+  <div class="actions"><a class="btn btn-primary" href="#/segmento/${q.segId}">Volver a la lectura</a><button type="button" class="btn btn-secondary" data-action="retry-final" data-seg="${q.segId}">Repetir prueba</button></div>`);
 
 // Las palabras que falles en la verificación pasan de "La sé" a estudio.
 QUIZ_DONE.verify = q => {
@@ -1217,7 +1217,7 @@ QUIZ_DONE.verify = q => {
 };
 QUIZ_RESULT.verify = q => quizResultCard(q, 'Resultado de la verificación', `
   ${q.moved?.length ? banner('warn', `${plural(q.moved.length, 'palabra pasó', 'palabras pasaron')} a estudio`, esc(q.moved.join(', '))) : ''}
-  <div class="actions"><a class="btn btn-primary" href="#/segmento/${q.segId}">Ir al segmento</a></div>`);
+  <div class="actions"><a class="btn btn-primary" href="#/segmento/${q.segId}">Ir a la lectura</a></div>`);
 
 /* ===================== 7. Acciones y registro ===================== */
 
@@ -1250,7 +1250,7 @@ Object.assign(ROUTE_ENTER, {
     state.ui.quizInfo = null;
     if (state.ui.quiz?.context === 'final' && state.ui.quiz.segId === id && !state.ui.quiz.done) return;
     const words = seg ? segWords(seg).filter(isStudyReady) : [];
-    if (words.length < 3) { state.ui.quiz = null; state.ui.quizInfo = { error: 'Necesitas al menos 3 palabras en estudio con significado en este segmento.' }; return; }
+    if (words.length < 3) { state.ui.quiz = null; state.ui.quizInfo = { error: 'Necesitas al menos 3 palabras en estudio con significado en esta lectura.' }; return; }
     state.ui.quiz = buildQuiz(words, { size: Math.min(40, words.length), context: 'final', segId: id, title: `Prueba final · ${seg.title}` });
   },
   verificar: id => {
@@ -1316,7 +1316,8 @@ document.addEventListener('drop', e => {
   if (!z) return;
   e.preventDefault();
   z.classList.remove('over');
-  handleBookFile(e.dataTransfer?.files?.[0]);
+  const file = e.dataTransfer?.files?.[0];
+  if (file) (FILE_INPUTS[z.dataset.drop] || handleBookFile)(file);   // data-drop="import-file" → importar respaldo
 });
 
 const currentSeg = () => segmentById(currentRoute().param);
@@ -1334,7 +1335,7 @@ Object.assign(actions, {
   },
   'delete-book': el => {
     const book = state.lib.books.find(b => b.id === el.dataset.id);
-    if (!book || !confirm(`¿Borrar «${book.title}» y sus segmentos? Las palabras en estudio y el vocabulario global se conservan.`)) return;
+    if (!book || !confirm(`¿Borrar «${book.title}» y sus lecturas? Las palabras en estudio y el vocabulario global se conservan.`)) return;
     for (const seg of state.lib.segments.filter(s => s.bookId === book.id)) deleteSegment(seg);
     state.lib.books = state.lib.books.filter(b => b.id !== book.id);
     libDelete('books', book.id);
@@ -1373,7 +1374,7 @@ Object.assign(actions, {
     if (!bs?.preview) return;
     const seg = createSegment(bs);
     bs.preview = null; bs.title = '';
-    toast(`Segmento creado: ${plural(seg.candidates.length, 'palabra candidata', 'palabras candidatas')}`);
+    toast(`Lectura creada: ${plural(seg.candidates.length, 'palabra candidata', 'palabras candidatas')}`);
     go(`segmento/${seg.id}`);
   },
 
@@ -1403,14 +1404,14 @@ Object.assign(actions, {
   'export-csv-seg': el => {
     const seg = segmentById(el.dataset.seg);
     const words = seg ? segWords(seg).filter(isStudyReady) : [];
-    if (!words.length) { toast('Este segmento no tiene palabras en estudio con significado.'); return; }
+    if (!words.length) { toast('Esta lectura no tiene palabras en estudio con significado.'); return; }
     downloadFile(`anki-${slug(seg.title)}.csv`, exportCSV(words, `${bookTitle(seg.bookId)} ${seg.title}`), 'text/csv;charset=utf-8');
   },
   'delete-segment': el => {
     const seg = segmentById(el.dataset.seg);
-    if (!seg || !confirm(`¿Borrar el segmento «${seg.title}»? Las palabras en estudio se conservan.`)) return;
+    if (!seg || !confirm(`¿Borrar la lectura «${seg.title}»? Las palabras en estudio se conservan.`)) return;
     deleteSegment(seg);
-    toast('Segmento borrado');
+    toast('Lectura borrada');
     go('lecturas');
   },
   'retry-final': el => { state.ui.quiz = null; go(`prueba/${el.dataset.seg}`); },

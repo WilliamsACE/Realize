@@ -20,10 +20,9 @@ function renderHome() {
   const ready = words.filter(isStudyReady);
   const { due, newAvail, pinned, total } = dailyPlan(now);
   const waiting = words.filter(w => !isStudyReady(w)).length;
-  // El aviso de palabras sin significado vuelve a salir solo si hay más que cuando se cerró.
-  const dismissed = settings.dismissedBanners || {};
   const backup = backupReminder(now);
-  const counts = [1, 2, 3, 4, 5].map(st => words.filter(w => w.stage === st).length);
+  const learning = words.filter(w => !isNew(w) && !isLearned(w)).length;
+  const learnedCount = words.filter(isLearned).length;
   const leeches = words.filter(isLeech).length;
   const mastered = words.filter(isMastered).length;
   const upcoming = ready.filter(w => !isNew(w)).sort((a, b) => (a.srs.due ?? Infinity) - (b.srs.due ?? Infinity)).slice(0, 5);
@@ -40,9 +39,7 @@ function renderHome() {
   <div class="home-main">
   <div class="page-head"><span class="muted small">Hoy</span><h1>Tu práctica</h1></div>
 
-  ${!hasKey() && !dismissed.ai ? `<div class="banner banner-info has-close">${icon('sparkle', 24)}
-    <div class="banner-body"><b>Conecta la IA</b><span>Agrega tu API key de Gemini, DeepSeek u OpenAI para completar palabras automáticamente y recibir retroalimentación de tus oraciones.</span></div>
-    <a class="btn btn-primary btn-sm" href="#/ajustes">Agregar API key</a>${bannerClose('ai')}</div>` : ''}
+  ${aiBanner()}
   ${backup ? banner('info', backup.never ? 'Haz tu primer respaldo' : `Hace ${backup.days} días de tu último respaldo`,
     backup.never ? 'Tu progreso solo vive en este navegador: si se borran sus datos, se pierde. Descarga una copia en un archivo.' : 'Descarga una copia nueva para no perder lo que avanzaste desde entonces.',
     `<div class="actions"><button type="button" class="btn btn-dark btn-sm" data-action="export">${icon('download', 18)}<span>Descargar respaldo</span></button></div>`, 'backup') : ''}
@@ -62,9 +59,11 @@ function renderHome() {
         ? '<button class="btn btn-hero" data-action="start-session">Estudiar</button>'
         : '<a class="btn btn-hero" href="#/lecturas">Preparar una lectura</a>'}
     </div>
-    <div class="stat-grid">
-      ${counts.map((c, i) => `<div class="stat"><b>${c}</b><span>${STAGES[i + 1]}</span></div>`).join('')}
-      <div class="stat leech" title="Palabras con 5 o más fallos"><b>${leeches}</b><span>Leeches</span></div>
+    <div class="stat-grid four">
+      <div class="stat"><b>${words.filter(isNew).length}</b><span>Nuevas</span></div>
+      <div class="stat"><b>${learning}</b><span>Aprendiendo</span></div>
+      <div class="stat ok"><b>${learnedCount}</b><span>Aprendidas</span></div>
+      <div class="stat leech" title="Palabras que has fallado 5 veces o más"><b>${leeches}</b><span>Difíciles</span></div>
     </div>
   </div>
 

@@ -37,6 +37,7 @@ const ICON_PATHS = {
   repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   tick: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>',
   cloud: '<path d="M7 19h10.5a4.5 4.5 0 0 0 .6-8.96A6.5 6.5 0 0 0 5.6 9.4 4.8 4.8 0 0 0 7 19z"/>',
   sync: '<path d="M20 11a8 8 0 0 0-14.6-4.6L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.6 4.6L20 16"/><path d="M20 20v-4h-4"/>',
 };
@@ -59,7 +60,7 @@ function speakBtn(text, label = 'Escuchar', size = '') {
   if (!speech.supported || !text) return '';
   return `<button type="button" class="speak ${size}" data-action="speak" data-text="${esc(text)}" aria-label="${esc(label)}" title="${esc(label)}">${icon('speaker')}</button>`;
 }
-function leechBadge(w) { return isLeech(w) ? '<span class="badge-leech" title="Palabra difícil: 5 o más fallos">Leech</span>' : ''; }
+function leechBadge(w) { return isLeech(w) ? '<span class="badge-leech" title="Palabra difícil: la has fallado 5 veces o más">Difícil</span>' : ''; }
 
 function formatDue(w, now = Date.now()) {
   if (isNew(w)) return 'Nueva';
@@ -126,15 +127,15 @@ const FIELDS = [
   { key: 'word', label: 'Palabra', type: 'text' },
   { key: 'note', label: 'Tu comentario (qué significado quieres recordar; no se muestra)', type: 'text' },
   { key: 'translation', label: 'Traducción al español', type: 'text' },
-  { key: 'ipa', label: 'Pronunciación (IPA)', type: 'text' },
-  { key: 'pos', label: 'Parte de la oración', type: 'text' },
+  { key: 'ipa', label: 'Pronunciación (símbolos fonéticos)', type: 'text' },
+  { key: 'pos', label: 'Tipo de palabra (verbo, sustantivo…)', type: 'text' },
   { key: 'definition', label: 'Definición simple (en inglés)', type: 'area', rows: 2, wide: true },
   { key: 'otherMeanings', label: 'Otros significados (uno por línea)', type: 'list', rows: 2, wide: true },
   { key: 'examples', label: 'Oraciones de ejemplo (una por línea)', type: 'list', rows: 3, wide: true },
-  { key: 'collocations', label: 'Colocaciones (una por línea)', type: 'list', rows: 3 },
+  { key: 'collocations', label: 'Combinaciones frecuentes (una por línea)', type: 'list', rows: 3 },
   { key: 'family', label: 'Familia de palabras (una por línea)', type: 'list', rows: 3 },
   { key: 'mnemonic', label: 'Truco mnemotécnico', type: 'area', rows: 2, wide: true },
-  { key: 'distractors', label: 'Distractores para opción múltiple (traducciones incorrectas, una por línea)', type: 'list', rows: 3, wide: true },
+  { key: 'distractors', label: 'Respuestas falsas para los ejercicios de elegir (traducciones incorrectas, una por línea)', type: 'list', rows: 3, wide: true },
 ];
 
 function wordFields(d, scope) {
@@ -147,6 +148,20 @@ function wordFields(d, scope) {
       : `<textarea class="textarea" rows="${f.rows}" ${attrs}>${esc(val)}</textarea>`;
     return `<div class="field${f.wide ? ' wide' : ''}"><label class="label" for="${id}">${f.label}</label>${control}</div>`;
   }).join('')}</div>`;
+}
+
+/* Aviso único de «todavía no hay IA conectada»: el mismo en toda la app. Al cerrarlo se
+   oculta en todas partes. `force`: el usuario acaba de pedir algo que necesita IA, así que
+   se muestra aunque lo haya cerrado (y cerrarlo ahí solo lo quita de la vista).
+   `short`: versión corta del texto para el celular, donde la estrella va junto al título y
+   el botón ocupa todo el ancho. */
+const AI_BANNER_TEXT = 'Conecta una IA (Gemini, DeepSeek u OpenAI; Gemini tiene plan gratis) para que complete tus palabras y corrija tus oraciones. Solo tienes que pegar una clave en Ajustes.';
+const AI_BANNER_SHORT = 'Completa tus palabras y corrige tus oraciones. Gemini es gratis.';
+function aiBanner(text = AI_BANNER_TEXT, { force = false, short = AI_BANNER_SHORT } = {}) {
+  if (hasKey() || (!force && isDismissed('ai'))) return '';
+  return `<div class="banner banner-info has-close ai-banner">${icon('sparkle', 24)}
+    <div class="banner-body"><b>${icon('sparkle', 18)}Conecta la IA</b><span class="ai-long">${text}</span><span class="ai-short">${short}</span></div>
+    <a class="btn btn-primary btn-sm" href="#/ajustes">Conectar IA</a>${bannerClose(force ? '' : 'ai')}</div>`;
 }
 
 // `dismiss`: clave del aviso para mostrar el botón de cerrar (ver la acción dismiss-banner).
@@ -194,7 +209,7 @@ function isDismissed(key, count = null) {
 function coverageBar(seg, { compact = false } = {}) {
   const p = segmentCoverage(seg);
   const target = state.data.settings.coverageTarget;
-  return `<div class="coverage ${compact ? 'compact' : ''}" role="img" aria-label="Cobertura ${fmtPct(p)} de ${target}%">
+  return `<div class="coverage ${compact ? 'compact' : ''}" role="img" aria-label="Conoces el ${fmtPct(p)} de las palabras (objetivo ${target}%)">
     <div class="coverage-fill ${p >= target ? 'ready' : ''}" style="width:${p}%"></div>
     <div class="coverage-target" style="left:${target}%" title="Objetivo ${target}%"></div>
   </div>`;

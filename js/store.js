@@ -90,6 +90,7 @@ function defaultSettings() {
     dismissedBanners: {},        // avisos cerrados en Inicio: { ai: true, waiting: <palabras al cerrarlo> }
     // Sincronización entre dispositivos (js/sync.js): repositorio privado de GitHub del usuario.
     syncRepo: '', syncToken: '', syncAuto: true, syncLastAt: null,
+    welcomeDone: true,           // false solo en una instalación nueva: muestra la bienvenida (ui/welcome.js)
   };
 }
 function emptyIntroduced(date = null) { return { date, classic: 0, relaxed: 0, intensive: 0 }; }
@@ -103,7 +104,7 @@ function defaultStats() {
     lastExportAt: null,
   };
 }
-function defaultData() { return { version: 2, words: sampleWords(), settings: defaultSettings(), stats: defaultStats(), captures: [], groups: [] }; }
+function defaultData() { return { version: 2, words: sampleWords(), settings: { ...defaultSettings(), welcomeDone: false }, stats: defaultStats(), captures: [], groups: [] }; }
 
 /* Grupo de palabras (ver ui/groups.js). type: 'meaning' (significan casi lo mismo, se
    practican emparejando definiciones cortas) o 'spelling' (se escriben parecido, se
@@ -154,9 +155,63 @@ function loadData() {
   }
 }
 
+function saveLocal(data) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(`${STORAGE_KEY}:at`, String(Date.now()));
+    return true;
+  } catch (e) { console.error('No se pudo guardar', e); return false; }
+}
+
+/* Dónde viven los datos: al cargar la página se leen de localStorage (para pintar al
+   instante) y en el arranque se mudan a IndexedDB (ver loadAppData), que no tiene el límite
+   de ~5 MB de localStorage. Desde entonces se guardan solo ahí. */
+const DATA_RECORD = 'appData';
+const dataStore = { idb: false, writing: null, again: false };
+
 function saveData(data) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); return true; }
-  catch (e) { console.error('No se pudo guardar', e); return false; }
+  if (!dataStore.idb) return saveLocal(data);
+  // Las escrituras se encadenan: si hay una en curso, al terminar se guarda el estado más reciente.
+  if (dataStore.writing) { dataStore.again = true; return true; }
+  dataStore.writing = idbPut('meta', { key: DATA_RECORD, data, at: Date.now() })
+    .catch(e => {
+      console.error('No se pudo guardar en IndexedDB', e);
+      if (!saveLocal(data)) toast('No se pudo guardar en este navegador (almacenamiento lleno o bloqueado).', 'err');
+    })
+    .finally(() => {
+      dataStore.writing = null;
+      if (dataStore.again) { dataStore.again = false; saveData(state.data); }
+    });
+  return true;
+}
+
+// Arranque: carga los datos de IndexedDB o, la primera vez, los muda ahí desde localStorage.
+async function loadAppData() {
+  if (!state.lib.available) return;   // sin IndexedDB se quedan en localStorage
+  try {
+    const rec = await idbGet('meta', DATA_RECORD);
+    let localAt = 0, hasLocal = false;
+    try { hasLocal = localStorage.getItem(STORAGE_KEY) != null; localAt = Number(localStorage.getItem(`${STORAGE_KEY}:at`)) || 0; } catch { /* sin acceso */ }
+    // Gana lo más reciente: si un guardado no pudo ir a IndexedDB y cayó a localStorage, se usa ese.
+    // (state.data ya trae lo de localStorage: se cargó al abrir la página.)
+    if (rec?.data && !(hasLocal && localAt > (rec.at || 0))) state.data = migrateData(rec.data);
+    else await idbPut('meta', { key: DATA_RECORD, data: state.data, at: Date.now() });
+    dataStore.idb = true;
+    try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(`${STORAGE_KEY}:at`); } catch { /* sin acceso */ }
+  } catch (e) {
+    console.warn('Los datos siguen en localStorage', e);
+  }
+}
+
+// Pide al navegador que no borre los datos solo (por falta de espacio o por no usar el sitio).
+// Se pide en cuanto hay progreso real; antes no vale la pena.
+async function protectStorage(force = false) {
+  try {
+    if (!navigator.storage?.persist) return null;
+    if (await navigator.storage.persisted()) return true;
+    if (!force && !state.data.stats.lastStudyDate && !state.data.words.some(w => w.introducedAt)) return false;
+    return await navigator.storage.persist();
+  } catch { return null; }
 }
 
 /* ---------- IndexedDB: lecturas, vocabulario global y caché de IA ---------- */

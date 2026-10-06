@@ -22,6 +22,8 @@ const ROUTE_ENTER = {
     if (w && state.ui.editDraft?.id !== w.id) state.ui.editDraft = { id: w.id, stage: w.stage, ...cleanContent(w) };
   },
 };
+// Guardas: devuelven otra ruta a la que ir en lugar de la pedida (p. ej., la bienvenida).
+const ROUTE_GUARDS = [];
 // Rutas en las que funcionan los atajos 1–4.
 const KEY_ROUTES = new Set(['estudiar', 'prueba', 'verificar']);
 const NAV_PARENT = { editar: 'palabras', libro: 'lecturas', segmento: 'lecturas', triage: 'lecturas', glosario: 'lecturas', prueba: 'lecturas', verificar: 'lecturas', captura: 'lecturas' };
@@ -39,6 +41,10 @@ function go(path) {
 // Se ejecuta al cambiar de pantalla: prepara el estado que la vista necesita.
 function onRoute() {
   const r = currentRoute();
+  for (const guard of ROUTE_GUARDS) {
+    const to = guard(r);
+    if (to && to !== r.name) { location.replace(`#/${to}`); return; }
+  }
   ROUTE_ENTER[r.name]?.(r.param);
   render();
   animateView();

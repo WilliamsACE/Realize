@@ -12,18 +12,6 @@ function uniqueLines(text) {
     .slice(0, 60);
 }
 
-function inlineKeyCard() {
-  const p = aiProvider();
-  return `<form class="card stack-sm" data-submit="save-inline-key" autocomplete="off">
-    <div class="row gap-sm"><span class="icon-tile">${icon('key')}</span><div class="stack-xs"><b>Conecta ${p.name}</b><span class="hint">Pega tu API key para completar con IA. Sin key puedes agregarlas a mano.</span></div></div>
-    <div class="input-group">
-      <input class="input" name="key" type="password" spellcheck="false" placeholder="${p.keyPlaceholder}" aria-label="${p.keyLabel}">
-      <button class="btn btn-dark btn-sm" type="submit" style="min-height:48px">Guardar</button>
-    </div>
-    <p class="hint">Se guarda solo en este navegador. <a href="${p.keyUrl}" target="_blank" rel="noopener">Obtener una key</a> · <a href="#/ajustes">Cambiar de proveedor</a></p>
-  </form>`;
-}
-
 function draftCard(d, i) {
   const u = state.ui;
   const dup = d.word && wordExists(d.word);
@@ -89,9 +77,9 @@ function renderAdd(param) {
         ${busy ? '<span class="spinner"></span>' : icon('sparkle')}<span>${busy ? esc(u.addProgress || 'Completando…') : 'Completar con IA'}</span>
       </button>
       <button type="button" class="btn btn-secondary btn-block" data-action="manual-drafts" ${busy ? 'disabled' : ''}>Agregar a mano</button>
-      ${!hasKey() ? inlineKeyCard() : ''}
     </div>
     <div class="col-preview stack">
+      ${aiBanner('Con una IA conectada, cada palabra se completa sola: significado, pronunciación, ejemplos y un truco para recordarla. Sin IA puedes agregarlas a mano.', { force: u.needAi, short: 'Cada palabra se completa sola. Sin IA, agrégalas a mano.' })}
       ${u.addError ? banner('err', 'No se pudo completar con IA', esc(u.addError),
         !u.drafts.length && u.pendingWords.length ? '<div class="actions"><button type="button" class="btn btn-dark btn-sm" data-action="continue-manual">Continuar a mano</button></div>' : '', true) : ''}
       ${preview}
@@ -103,8 +91,8 @@ function renderAdd(param) {
 
 const FILTERS = [
   ['all', 'Todas'], ['due', 'Para hoy'], ['new', 'Nuevas'], ['noai', 'Esperan significado'], ['reading', 'De lecturas'],
-  ['s1', 'Exposición'], ['s2', 'Reconocimiento'], ['s3', 'Recuerdo'], ['s4', 'Cloze'], ['s5', 'Producción'],
-  ['learned', 'Aprendidas'], ['mastered', 'Dominadas'], ['leech', 'Leeches'], ['pinned', 'Fijadas ★'],
+  ...[1, 2, 3, 4, 5].map(n => [`s${n}`, `Paso ${n} · ${STAGES[n]}`]),
+  ['learned', 'Aprendidas'], ['mastered', 'Dominadas'], ['leech', 'Difíciles'], ['pinned', 'Fijadas ★'],
 ];
 
 function filteredWords() {
@@ -174,10 +162,10 @@ function waitingBanner() {
   if (!waiting || isDismissed('wordsWaiting', waiting)) return '';
   const busy = state.ui.enrichBusy;
   return banner('warn', `${plural(waiting, 'palabra no tiene', 'palabras no tienen')} significado`,
-    hasKey() ? 'No entran a las sesiones hasta tenerlo. La IA puede buscarlo por ti, o usa ✦ en cada palabra.' : 'No entran a las sesiones hasta tenerlo. Conecta la IA para buscarlo automáticamente o complétalo a mano.',
+    hasKey() ? 'No entran a las sesiones hasta tenerlo. La IA puede buscarlo por ti, o usa ✦ en cada palabra.' : 'No entran a las sesiones hasta tenerlo. Complétalo a mano con el lápiz de cada palabra.',
     `<div class="actions">${hasKey()
       ? `<button type="button" class="btn btn-dark btn-sm" data-action="enrich-pending" ${busy ? 'disabled' : ''}>${busy ? `<span class="spinner"></span><span>${esc(busy)}</span>` : `${icon('sparkle', 18)}<span>Buscar ${waiting === 1 ? 'su significado' : 'todos los significados'}</span>`}</button>`
-      : '<a class="btn btn-dark btn-sm" href="#/ajustes">Conectar la IA</a>'}
+      : ''}
       ${state.ui.filter !== 'noai' ? '<button type="button" class="btn btn-secondary btn-sm" data-action="show-noai">Ver solo esas</button>' : ''}</div>`, 'wordsWaiting', waiting);
 }
 
@@ -192,6 +180,7 @@ function renderWords() {
       <a class="btn btn-primary btn-sm only-desktop" href="#/agregar">${icon('plus', 18)}<span>Agregar</span></a>
     </div>
   </div>
+  ${state.data.words.some(w => !isStudyReady(w)) ? aiBanner('Con una IA conectada, las palabras sin significado se completan solas en un momento.', { short: 'Las palabras sin significado se completan solas.' }) : ''}
   ${waitingBanner()}
   <div class="toolbar">
     <input type="search" class="input" placeholder="Buscar palabra o traducción" aria-label="Buscar" data-bind="search" value="${esc(u.search)}">
@@ -224,15 +213,14 @@ function renderEdit(id) {
     <aside class="col-side stack">
       <div class="card stack-sm">
         <h2>Progreso</h2>
-        <label class="label" for="edit-stage">Etapa</label>
+        <label class="label" for="edit-stage">Paso</label>
         <select id="edit-stage" class="input" data-bind="edit-stage">
           ${[1, 2, 3, 4, 5].map(st => `<option value="${st}" ${d.stage === st ? 'selected' : ''}>${st} · ${STAGES[st]}</option>`).join('')}
         </select>
         <div class="kv"><span>Modo</span><b style="color:var(--text)">${MODES[wordMode(w)]}</b></div>
         <div class="kv"><span>Próximo repaso</span><b>${formatDue(w)}</b></div>
-        <div class="kv"><span>Intervalo actual</span><b>${w.srs.interval} d</b></div>
-        ${recallChance(w.srs) != null ? `<div class="kv"><span>Probabilidad de recordarla hoy</span><b>${Math.round(recallChance(w.srs) * 100)} %</b></div>
-        <div class="kv"><span>Estabilidad · dificultad</span><b>${w.srs.stability >= 1 ? Math.round(w.srs.stability) : w.srs.stability.toFixed(1)} d · ${Math.round(w.srs.difficulty * 10) / 10} / 10</b></div>` : ""}
+        <div class="kv"><span>Se repasa cada</span><b>${w.srs.interval ? plural(w.srs.interval, 'día', 'días') : 'unos minutos'}</b></div>
+        ${recallChance(w.srs) != null ? `<div class="kv"><span>Probabilidad de recordarla hoy</span><b>${Math.round(recallChance(w.srs) * 100)} %</b></div>` : ''}
         <div class="kv"><span>Días con acierto</span><b>${w.successDays.length}</b></div>
         <div class="kv"><span>Fallos</span><span class="row gap-sm"><b style="color:var(--text)">${w.srs.lapses}</b>${leechBadge(w)}</span></div>
         <button type="button" class="btn btn-secondary btn-sm" data-action="reset-progress">Reiniciar progreso</button>

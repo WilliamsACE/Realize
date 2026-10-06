@@ -389,15 +389,6 @@ const actions = {
     toast(`${plural(added, 'palabra guardada', 'palabras guardadas')}${skipped ? ` · ${skipped} repetida(s) omitida(s)` : ''}`);
     render();
   },
-  'save-inline-key': form => {
-    const key = form.elements.key.value.trim();
-    if (!key) { toast('Pega tu API key primero.'); return; }
-    state.data.settings[aiProvider().keySetting] = key;
-    persist();
-    state.ui.addError = null;
-    toast('API key guardada');
-    render();
-  },
   'enrich-pending': async () => {
     if (state.ui.enrichBusy) return;
     const words = state.data.words.filter(w => !isStudyReady(w));
@@ -515,8 +506,13 @@ const actions = {
     const key = el.dataset.banner;
     const box = el.closest('.banner');
     const done = () => {
-      // Aviso temporal: solo se quita de la vista.
-      if (!key) { box?.remove(); return; }
+      // Aviso temporal: solo se quita de la vista (el de «conecta la IA» deja de forzarse).
+      if (!key) {
+        state.ui.needAi = false;
+        if (state.ui.groupDraft) state.ui.groupDraft.needAi = false;
+        box?.remove();
+        return;
+      }
       const s = state.data.settings;
       const value = el.dataset.seen != null ? Number(el.dataset.seen) : key === 'backup' ? Date.now() : true;
       s.dismissedBanners = { ...s.dismissedBanners, [key]: value };
@@ -582,7 +578,8 @@ const actions = {
     toast(`Se agregaron ${plural(missing.length, 'palabra', 'palabras')} de ejemplo`);
   },
   'wipe-all': () => {
-    if (!confirm('¿Borrar TODAS tus palabras y estadísticas? Tus lecturas y el vocabulario global se conservan. Exporta un respaldo antes si lo necesitas.')) return;
+    if (!confirm('¿Borrar TODAS tus palabras y estadísticas? Tus lecturas y el vocabulario global se conservan. Antes se guarda una copia que puedes restaurar en Ajustes → Tus datos.')) return;
+    saveCopy('Antes de borrar todo');
     state.data = { ...state.data, words: [], stats: defaultStats(), captures: [], groups: [] };
     state.ui.session = null;
     persist();
@@ -623,7 +620,7 @@ async function enrichAction() {
   if (!list.length) { toast('Escribe al menos una palabra.'); return; }
   u.pendingWords = list;
   if (!hasKey()) {
-    u.addError = `Falta la ${aiProvider().keyLabel}. Pégala abajo o en Ajustes, o agrega las palabras a mano.`;
+    u.needAi = true;   // muestra el aviso de conectar la IA aunque se haya cerrado
     render();
     return;
   }

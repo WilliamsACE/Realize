@@ -68,7 +68,8 @@ const FILE_INPUTS = {
     try {
       const raw = JSON.parse(await file.text());
       const n = Array.isArray(raw.words) ? raw.words.length : 0;
-      if (!confirm(`Se importarán ${plural(n, 'palabra', 'palabras')}${raw.lib ? ' y tus lecturas' : ''}, y reemplazarán tus datos actuales. ¿Continuar?`)) return;
+      if (!confirm(`Se importarán ${plural(n, 'palabra', 'palabras')}${raw.lib ? ' y tus lecturas' : ''}, y reemplazarán tus datos actuales${syncReady() ? ' y, al sincronizar, los de tus otros dispositivos' : ''}. ¿Continuar?`)) return;
+      await saveCopy('Antes de importar');
       const data = await importAll(raw);
       if (!data.settings.apiKey) data.settings.apiKey = state.data.settings.apiKey;
       if (!data.settings.deepseekKey) data.settings.deepseekKey = state.data.settings.deepseekKey;
@@ -136,9 +137,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     pickVoice();
     speechSynthesis.addEventListener?.('voiceschanged', pickVoice);
   }
-  persist(); // guarda los ejemplos en la primera visita
+  // El orden importa: primero se cargan los datos guardados y solo después se guarda
+  // (si no, los de ejemplo pisarían a los reales).
   await loadLib();
+  await loadAppData();
+  persist();          // guarda los ejemplos en la primera visita
   onRoute();
   syncBoot();         // js/sync.js: trae los cambios de tus otros dispositivos
   registerOffline();  // app instalable y sin conexión
+  dailyCopy();        // js/history.js: copia automática del día
+  protectStorage();   // que el navegador no borre los datos por su cuenta
 });

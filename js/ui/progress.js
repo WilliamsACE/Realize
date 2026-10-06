@@ -59,7 +59,7 @@ function achievementList(p) {
     { icon: 'edit', name: 'Escritor', desc: 'Escribe 10 oraciones', cur: p.sentences, goal: 10 },
     { icon: 'book', name: 'Lector', desc: 'Prepara tu primera lectura', cur: p.segments, goal: 1 },
     { icon: 'flame', name: 'Semana perfecta', desc: 'Racha de 7 días', cur: p.bestStreak, goal: 7 },
-    { icon: 'target', name: 'Listo para leer', desc: 'Llega al objetivo de cobertura en una lectura', cur: p.readySegs, goal: 1 },
+    { icon: 'target', name: 'Listo para leer', desc: 'Conoce casi todas las palabras de una lectura antes de leerla', cur: p.readySegs, goal: 1 },
     { icon: 'star', name: 'Dominio', desc: 'Domina 10 palabras', cur: p.mastered, goal: 10 },
     { icon: 'bolt', name: 'Constancia', desc: 'Estudia 30 días distintos', cur: p.studyDays, goal: 30 },
     { icon: 'flame', name: 'Imparable', desc: 'Racha de 30 días', cur: p.bestStreak, goal: 30 },
@@ -115,7 +115,7 @@ function storyEvents() {
   // Palabras difíciles (leech) vencidas; las de antes de guardar la fecha cuentan al dominarlas.
   marks(words, w => w.leechBeatenAt || (isLeech(w) && w.masteredAt) || 0, LEECH_MARKS, (n, ws, last) => (n === 1
     ? { kind: 'leech', icon: 'bolt', title: `Venciste tu primera palabra difícil: «${last.word}»`, detail: `Te costó ${plural(last.srs.lapses, 'intento fallido', 'intentos fallidos')}, pero no te rendiste.` }
-    : { kind: 'leech', icon: 'bolt', title: `Te deshiciste de ${n} palabras difíciles`, detail: 'Palabras que se te resistían (leech) y que ahora aciertas.', words: chips(ws) }));
+    : { kind: 'leech', icon: 'bolt', title: `Te deshiciste de ${n} palabras difíciles`, detail: 'Palabras que se te resistían y que ahora aciertas.', words: chips(ws) }));
 
   const sentences = words.flatMap(w => w.sentences.filter(x => x.at));
   marks(sentences, x => x.at, SENTENCE_MARKS, (n, xs, last) => (n === 1

@@ -395,7 +395,7 @@ function finishSession(s, completed = true) {
   // Modo intensivo: minitest mezclado con las palabras vistas en la sesión.
   if (!s.quiz) {
     const words = Object.keys(s.intensiveSeen).map(findWord).filter(w => w && isStudyReady(w));
-    if (words.length >= 2) s.quiz = buildQuiz(words, { size: 8, context: 'minitest', title: 'Minitest de la sesión' });
+    if (words.length >= 2) s.quiz = buildQuiz(words, { size: 8, context: 'minitest', title: 'Mini prueba de la sesión' });
   }
 }
 

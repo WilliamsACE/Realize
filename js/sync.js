@@ -21,7 +21,7 @@ const SYNC_DELAY = 15 * 1000;        // espera tras un cambio antes de subirlo (
 const SYNC_EVERY = 5 * MINUTE;       // con la app abierta, mira si hay cambios de otro dispositivo
 // Ajustes propios de cada dispositivo: no se suben ni se sobrescriben al fusionar.
 const DEVICE_SETTINGS = ['apiKey', 'deepseekKey', 'openaiKey', 'provider', 'model', 'deepseekModel', 'openaiModel',
-  'dismissedBanners', 'syncRepo', 'syncToken', 'syncAuto', 'syncLastAt'];
+  'dismissedBanners', 'syncRepo', 'syncToken', 'syncAuto', 'syncLastAt', 'welcomeDone'];
 
 const sync = { busy: null, again: false, timer: null, status: 'off', error: null, dirty: false, applying: false, branch: null };
 const syncReady = (s = state.data.settings) => !!(s.syncRepo && s.syncToken);
@@ -542,22 +542,21 @@ function updateSyncUI() {
 
 function syncCard() {
   const s = state.data.settings;
-  const u = (state.ui.syncForm ||= { repo: s.syncRepo || '', busy: false, error: null, guide: false });
+  const u = (state.ui.syncForm ||= { repo: s.syncRepo || '', busy: false, error: null });
   if (!syncReady() || u.busy) {
     return `<section class="card stack" id="sync-card">
       <div class="row nowrap top">
         <span class="icon-tile">${icon('cloud')}</span>
-        <div class="stack-xs grow"><h2>Celular y computadora</h2>
-          <span class="hint">Usa la app en todos tus dispositivos con los mismos datos. Sin servidor: el navegador los guarda en un repositorio privado de GitHub que es solo tuyo.</span></div>
+        <div class="stack-xs grow"><h2>Sincronizar</h2>
+          <span class="hint">Usa la app en todos tus dispositivos con los mismos datos.</span></div>
       </div>
-      <details class="sync-guide" ${u.guide || !s.syncRepo ? 'open' : ''}>
+      <details class="sync-guide">
         <summary>Cómo conectarlo (solo la primera vez)</summary>
         <ol>
-          <li>Entra a <a href="https://github.com/signup" target="_blank" rel="noopener">GitHub</a> (la cuenta es gratis).</li>
-          <li><a href="https://github.com/new?name=realize-datos&visibility=private" target="_blank" rel="noopener">Crea un repositorio</a> y márcalo como <b>Private</b>.</li>
+          <li><a href="https://github.com/new?name=realize-datos&visibility=private" target="_blank" rel="noopener">Crea un repositorio en GitHub</a> y márcalo como <b>Private</b> (este será tu «servidor»). Si no tienes cuenta, <a href="https://github.com/signup" target="_blank" rel="noopener">créala gratis</a>.</li>
           <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Crea un token «Fine-grained»</a>: en <i>Repository access</i> elige <i>Only select repositories</i> y ese repositorio; en <i>Permissions → Repository permissions → Contents</i> elige <b>Read and write</b>. Ponle una expiración larga.</li>
           <li>Pega aquí el repositorio y el token, y pulsa <b>Conectar</b>.</li>
-          <li>En tu otro dispositivo abre la app y repite el paso 4.</li>
+          <li>En tu otro dispositivo abre la app y repite el paso 3.</li>
         </ol>
       </details>
       <form class="stack-sm" data-submit="sync-connect" autocomplete="off">
@@ -567,7 +566,7 @@ function syncCard() {
           <input id="sync-token" name="token" type="password" class="input" placeholder="github_pat_…" autocomplete="off" spellcheck="false" ${u.busy ? 'readonly' : ''}></div>
         ${u.error ? banner('err', 'No se pudo conectar', esc(u.error)) : ''}
         <button class="btn btn-primary btn-sm" type="submit" style="align-self:flex-start" ${u.busy ? 'disabled' : ''}>${u.busy ? '<span class="spinner"></span><span>Conectando…</span>' : `${icon('cloud', 18)}<span>Conectar</span>`}</button>
-        <p class="hint">El token se guarda solo en este dispositivo y no entra en los respaldos. Tus API keys de IA tampoco se sincronizan.</p>
+        <p class="hint">El token se guarda solo en este dispositivo y no entra en los respaldos. Tus claves de IA tampoco se sincronizan.</p>
       </form>
     </section>`;
   }
@@ -575,7 +574,7 @@ function syncCard() {
   return `<section class="card stack" id="sync-card">
     <div class="row nowrap top">
       <span class="icon-tile">${icon('cloud')}</span>
-      <div class="stack-xs grow"><span class="row gap-sm"><h2>Celular y computadora</h2><span class="chip ${st.cls === 'is-ok' ? 'chip-ok' : st.cls === 'is-error' ? 'chip-warn' : 'chip-accent'}">${st.label}</span></span>
+      <div class="stack-xs grow"><span class="row gap-sm"><h2>Sincronizar</h2><span class="chip ${st.cls === 'is-ok' ? 'chip-ok' : st.cls === 'is-error' ? 'chip-warn' : 'chip-accent'}">${st.label}</span></span>
         <span class="hint">Tus datos se sincronizan con tu repositorio privado de GitHub.</span></div>
     </div>
     <div class="kv"><span>Repositorio</span><a href="https://github.com/${esc(s.syncRepo)}" target="_blank" rel="noopener"><b>${esc(s.syncRepo)}</b></a></div>
@@ -590,6 +589,9 @@ function syncCard() {
   </section>`;
 }
 
+// La tarjeta de conexión vive en Ajustes y en la bienvenida.
+const refreshSyncViews = () => { if (['ajustes', 'bienvenida'].includes(currentRoute().name)) render(); };
+
 Object.assign(actions, {
   'sync-now': () => {
     if (!syncReady()) { go('ajustes'); return; }
@@ -602,9 +604,9 @@ Object.assign(actions, {
     u.repo = form.elements.repo.value.trim();
     u.error = !/^[\w.-]+\/[\w.-]+$/.test(repo) ? 'Escribe el repositorio como usuario/nombre (por ejemplo, ana/realize-datos).'
       : !token ? 'Pega el token de GitHub.' : null;
-    if (u.error) { refreshIfOn('ajustes'); return; }
+    if (u.error) { refreshSyncViews(); return; }
     u.busy = true;
-    refreshIfOn('ajustes');
+    refreshSyncViews();
     const conn = { syncRepo: repo, syncToken: token };
     try {
       const info = await ghRequest('', { settings: conn });
@@ -624,13 +626,14 @@ Object.assign(actions, {
       }
       u.error = null;
       toast(r.pulled ? 'Conectado: se trajeron tus datos de la nube' : 'Conectado: tus datos ya están en la nube');
+      if (currentRoute().name === 'bienvenida') { finishWelcome(); go('inicio'); return; }
     } catch (e) {
       u.busy = false;
       u.error = e.message || String(e);
       sync.branch = null;
     }
     updateSyncUI();
-    refreshIfOn('ajustes');
+    refreshSyncViews();
   },
   'sync-disconnect': async () => {
     if (!confirm('¿Desconectar este dispositivo? Tus datos se quedan aquí y en GitHub; solo deja de sincronizarse.')) return;
@@ -643,6 +646,6 @@ Object.assign(actions, {
     state.ui.syncForm = null;
     updateSyncUI();
     toast('Este dispositivo ya no se sincroniza');
-    refreshIfOn('ajustes');
+    refreshSyncViews();
   },
 });
