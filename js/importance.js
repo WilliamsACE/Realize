@@ -46,7 +46,8 @@ function ensureFreq() {
       if (!ok) setTimeout(() => { if (freqData.state === 'failed') freqData.state = 'idle'; }, 30000);
       freqData.version++;
       resolve();
-      if (['segmento', 'triage', 'glosario'].includes(currentRoute().name)) render();
+      const r = currentRoute().name;
+      if (['segmento', 'triage', 'glosario'].includes(r) || (r === 'palabras' && state.ui.filter === 'lowvalue')) render();
     };
     if (window.WORD_FREQ) { finish(true); return; }
     const s = document.createElement('script');
@@ -101,7 +102,7 @@ function infoOf(c) {
   const z = zipfOf(c);
   const language = z === undefined ? 0.5 : z === null ? 0 : clamp01((z - 2) / 2.3);   // 2 = rara, 4.3 o más = muy común
   const text = 1 - Math.exp(-c.freq / 3);                                           // 1 vez ≈ .28 · 3 ≈ .63 · 10 ≈ .96
-  const score = Math.round(100 * (0.5 * language + 0.5 * text));
+  const score = Math.round(100 * (c.noText ? language : 0.5 * language + 0.5 * text));   // noText: palabra sin texto de origen
   const flags = [];
   if (!c.phrase) {
     if (ARCHAIC.has(c.lemma) || c.forms.some(f => ARCHAIC.has(f))) {
@@ -129,6 +130,27 @@ function rankedCands(seg) {
   const list = seg.candidates.slice().sort((a, b) => infoOf(b).score - infoOf(a).score || b.freq - a.freq || a.lemma.localeCompare(b.lemma));
   rankCache.set(seg, { v: freqData.version, n: seg.candidates.length, list });
   return list;
+}
+
+/* ---------- Mis palabras: buscar las poco útiles ---------- */
+
+// Una palabra de tu lista vista como candidata. Las que vienen de una lectura traen cuántas veces
+// aparecieron; las que escribiste tú no tienen texto, así que solo cuenta su uso en el idioma.
+function wordInfo(w) {
+  const forms = [...new Set([normalize(w.word), lemmaOf(w), ...(w.forms || [])])];
+  return infoOf({
+    lemma: normalize(w.word), forms, freq: Math.max(1, w.freq || 0), noText: !w.freq,
+    phrase: /\s/.test(w.word.trim()),
+  });
+}
+
+// Poco útil: hay un motivo firme (rara, anticuada, sonido) o casi no se usa en inglés (importancia < 22).
+// No cuentan las que ya aprendiste ni las que fijaste: esas las elegiste tú.
+const LOW_VALUE_BELOW = 22;
+function isLowValue(w) {
+  if (w.pinned || isLearned(w) || !freqData.map) return false;
+  const i = wordInfo(w);
+  return i.skip || i.score < LOW_VALUE_BELOW;
 }
 
 /* ---------- Meta de la lectura ---------- */

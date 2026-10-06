@@ -2291,3 +2291,13 @@ body[data-route="bienvenida"] .main { max-width: 560px; margin: 0 auto; padding:
   .skip-tip span { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) { .tbtn-skip.is-suggested, .plan-bar i { animation: none !important; transition: none; } }
+
+/* Mis palabras → Poco útiles */
+.lowvalue-intro { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; padding: 14px 0 12px; border-bottom: 1px solid var(--border); }
+.lowvalue-intro .grow { flex: 1 1 260px; }
+@media (max-width: 599px) { .lowvalue-intro .btn { width: 100%; } }
+@media (max-width: 599px) {
+  .list-row > .stack-xs { flex-wrap: wrap; }
+  .list-row .why { flex: 1 0 100%; margin-top: 2px; }
+  .list-row .why .hint { display: none; }   /* el motivo completo queda en el tooltip de cada etiqueta */
+}

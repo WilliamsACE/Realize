@@ -92,7 +92,7 @@ function renderAdd(param) {
 const FILTERS = [
   ['all', 'Todas'], ['due', 'Para hoy'], ['new', 'Nuevas'], ['noai', 'Esperan significado'], ['reading', 'De lecturas'],
   ...[1, 2, 3, 4, 5].map(n => [`s${n}`, `Paso ${n} · ${STAGES[n]}`]),
-  ['learned', 'Aprendidas'], ['mastered', 'Dominadas'], ['leech', 'Difíciles'], ['pinned', 'Fijadas ★'],
+  ['learned', 'Aprendidas'], ['mastered', 'Dominadas'], ['leech', 'Difíciles'], ['pinned', 'Fijadas ★'], ['lowvalue', 'Poco útiles'],
 ];
 
 function filteredWords() {
@@ -109,9 +109,22 @@ function filteredWords() {
     if (filter === 'pinned') return w.pinned;
     if (filter === 'learned') return isLearned(w);
     if (filter === 'mastered') return isMastered(w);
+    if (filter === 'lowvalue') return isLowValue(w);
     if (/^s\d$/.test(filter)) return w.stage === Number(filter[1]);
     return true;
-  }).sort((a, b) => pinnedFirst(b) - pinnedFirst(a) || a.word.localeCompare(b.word));
+  }).sort(filter === 'lowvalue'
+    ? (a, b) => wordInfo(a).score - wordInfo(b).score || a.word.localeCompare(b.word)   // las menos útiles primero
+    : (a, b) => pinnedFirst(b) - pinnedFirst(a) || a.word.localeCompare(b.word));
+}
+
+// Encabezado del filtro «Poco útiles»: qué son, y quitar de golpe las que aún no empiezas a estudiar.
+function lowValueIntro(list) {
+  const removable = list.filter(w => isNew(w) && !w.pinned);
+  return `<div class="lowvalue-intro">
+    <div class="stack-xs grow"><b>${plural(list.length, 'palabra poco útil', 'palabras poco útiles')}</b>
+      <span class="hint">Casi no se usan en inglés, son anticuadas o parecen sonidos o gritos. No pasa nada por estudiarlas, pero tu tiempo rinde más con las comunes. Las que fijaste ★ o ya aprendiste no aparecen aquí.</span></div>
+    ${removable.length ? `<button type="button" class="btn btn-secondary btn-sm" data-action="prune-lowvalue">${icon('trash', 16)}<span>Quitar las ${removable.length} que no he empezado</span></button>` : ''}
+  </div>`;
 }
 // Las fijadas van primero, pero según cómo estaban la primera vez que se dibujó la lista
 // al entrar a Mis palabras: así una palabra no salta de lugar al fijarla; se reacomoda
@@ -123,16 +136,24 @@ function pinnedFirst(w) {
 
 function wordListHTML() {
   const list = filteredWords();
+  if (state.ui.filter === 'lowvalue') {
+    if (freqLoading() || (!freqData.map && freqData.state !== 'failed')) return '<p class="empty"><span class="row gap-sm" style="justify-content:center"><span class="spinner"></span><span>Revisando qué tan usada es cada palabra…</span></span></p>';
+    if (freqData.state === 'failed') return '<p class="empty">No se pudieron cargar los datos de uso del inglés. Conéctate a internet e inténtalo de nuevo.</p>';
+    if (!list.length) return '<p class="empty">No encontré palabras poco útiles en tu lista. ¡Buena selección!</p>';
+  }
   if (!state.data.words.length) return '<p class="empty">Aún no tienes palabras. <a href="#/agregar">Agrega la primera</a> o <a href="#/lecturas">prepara una lectura</a>.</p>';
   if (!list.length) return '<p class="empty">No hay palabras que coincidan.</p>';
   const now = Date.now();
-  return list.map(w => {
+  const low = state.ui.filter === 'lowvalue';
+  return (low ? lowValueIntro(list) : '') + list.map(w => {
     const mode = wordMode(w);
+    const why = low ? wordInfo(w) : null;
     return `
     <div class="list-row">
       <div class="stack-xs">
         <span class="row gap-sm"><span class="list-word">${esc(w.word)}</span>${leechBadge(w)}${isMastered(w) ? '<span class="chip chip-ok">Dominada</span>' : isLearned(w) ? '<span class="chip chip-ok">Aprendida</span>' : ''}</span>
         <span class="muted small">${isStudyReady(w) ? esc(w.translation || w.definition) : '<i>Sin significado todavía</i>'}</span>
+        ${why ? `<span class="row gap-sm why" style="gap:6px">${why.flags.map(f => `<span class="imp-flag ${f.hard ? 'hard' : ''}" title="${esc(f.why)}">${f.label}</span>`).join('')}${why.lang ? `<span class="hint">${why.lang}</span>` : ''}</span>` : ''}
       </div>
       <div class="list-meta">
         <span class="chip ${isDueToday(w, now) ? 'chip-accent' : ''}">${mode === 'relaxed' ? 'Relajado' : `${w.stage} · ${STAGES[w.stage]}`}</span>

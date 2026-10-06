@@ -412,6 +412,19 @@ const actions = {
   },
   'filter-noai': () => { state.ui.filter = 'noai'; go('palabras'); },
   'filter-new': () => { state.ui.filter = 'new'; go('palabras'); },
+  // Quita las poco útiles que todavía no se han empezado a estudiar (con copia para deshacer).
+  'prune-lowvalue': () => {
+    const gone = filteredWords().filter(w => isNew(w) && !w.pinned);
+    if (!gone.length) return;
+    if (!confirm(`¿Quitar ${plural(gone.length, 'palabra poco útil', 'palabras poco útiles')} que aún no has empezado a estudiar? Antes se guarda una copia que puedes restaurar en Ajustes → Tus datos → Versiones anteriores.`)) return;
+    saveCopy('Antes de quitar palabras poco útiles');
+    const ids = new Set(gone.map(w => w.id));
+    state.data.words = state.data.words.filter(w => !ids.has(w.id));
+    for (const g of groups()) g.ids = g.ids.filter(id => !ids.has(id));
+    persist();
+    toast(`${plural(gone.length, 'palabra quitada', 'palabras quitadas')}`);
+    render();
+  },
   'show-noai': () => { state.ui.filter = 'noai'; render(); },
   'toggle-pin': el => {
     const w = findWord(el.dataset.id);

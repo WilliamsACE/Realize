@@ -15,7 +15,7 @@ const bindings = {
   sentence: el => { const ex = state.ui.session?.ex; if (ex) ex.sentence = el.value; },
   'rescue-note': el => { const ex = state.ui.session?.ex; if (ex?.type === 8) ex.note = el.value; },
   search: el => { state.ui.search = el.value; $('#word-list').innerHTML = wordListHTML(); },
-  filter: el => { state.ui.filter = el.value; $('#word-list').innerHTML = wordListHTML(); },
+  filter: el => { state.ui.filter = el.value; if (el.value === 'lowvalue') ensureFreq(); $('#word-list').innerHTML = wordListHTML(); },
   setting: el => {
     const s = state.data.settings;
     const k = el.dataset.key;
