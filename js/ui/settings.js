@@ -86,7 +86,7 @@ function renderSettings() {
         </div>
         ${toggle('noSpoilers', 'Sin spoilers', 'Usa ejemplos genéricos en lugar de las oraciones del libro.')}
         ${toggle('verifyKnown', 'Verificar «La sé»', 'Al terminar de revisar las palabras de un texto, te propone una mini prueba con algunas que marcaste como sabidas.')}
-        <p class="hint credit">Palabras comunes: ${esc(window.COMMON_WORDS_SOURCE || 'NGSL 1.2')} — New General Service List de Browne, Culligan y Phillips, <a href="https://www.newgeneralservicelist.com" target="_blank" rel="noopener">newgeneralservicelist.com</a>, licencia <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>.</p>
+        <p class="hint credit">Palabras comunes: ${esc(window.COMMON_WORDS_SOURCE || 'NGSL 1.2')} — New General Service List de Browne, Culligan y Phillips, <a href="https://www.newgeneralservicelist.com" target="_blank" rel="noopener">newgeneralservicelist.com</a>, licencia <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>. Frecuencia de uso: <a href="https://github.com/rspeer/wordfreq" target="_blank" rel="noopener">wordfreq</a> (CC BY-SA 4.0).</p>
       </section>`)}
 
     ${group('Tus datos', `${syncReady() ? 'Se sincronizan y además viven en este navegador' : 'Viven solo en este navegador'}${state.lib.available ? '' : ' <b>(sin IndexedDB: los libros se pierden al cerrar)</b>'}. Los respaldos no incluyen tus claves de IA ni el token.`, `

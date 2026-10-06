@@ -3,6 +3,20 @@
 
 /* ---------- Inicio ---------- */
 
+// Muchas palabras nuevas esperando su turno: se avisa cuántos días tardarán a tu ritmo, para que
+// no parezca que "debes" hacerlo todo ya. Vuelve a salir solo si la cola crece.
+const BACKLOG_MIN = 40;
+function backlogBanner(now = Date.now()) {
+  const queued = state.data.words.filter(w => isNew(w) && isStudyReady(w));
+  if (queued.length < BACKLOG_MIN || isDismissed('backlog', queued.length)) return '';
+  const perMode = {};
+  for (const w of queued) perMode[wordMode(w)] = (perMode[wordMode(w)] || 0) + 1;
+  const days = Math.max(...Object.entries(perMode).map(([m, n]) => Math.ceil(n / Math.max(1, dailyLimit(m)))));
+  return banner('info', `Tienes ${plural(queued.length, 'palabra nueva', 'palabras nuevas')} en espera`,
+    `Con tu ritmo diario tardarás unos ${plural(days, 'día', 'días')} en verlas todas. No hace falta apurarse: lo importante es repasar cada día. En una lectura puedes elegir solo las más importantes.`,
+    '<div class="actions"><a class="btn btn-secondary btn-sm" href="#/palabras" data-action="filter-new">Ver las nuevas</a></div>', 'backlog', queued.length);
+}
+
 // Lo que trae la sesión de hoy: repasos pendientes, nuevas que caben en la meta y fijadas extra.
 function dailyPlan(now = Date.now()) {
   const ready = state.data.words.filter(isStudyReady);
@@ -43,6 +57,7 @@ function renderHome() {
   ${backup ? banner('info', backup.never ? 'Haz tu primer respaldo' : `Hace ${backup.days} días de tu último respaldo`,
     backup.never ? 'Tu progreso solo vive en este navegador: si se borran sus datos, se pierde. Descarga una copia en un archivo.' : 'Descarga una copia nueva para no perder lo que avanzaste desde entonces.',
     `<div class="actions"><button type="button" class="btn btn-dark btn-sm" data-action="export">${icon('download', 18)}<span>Descargar respaldo</span></button></div>`, 'backup') : ''}
+  ${backlogBanner(now)}
   ${waiting && !isDismissed('waiting', waiting) ? banner('warn', `${plural(waiting, 'palabra espera', 'palabras esperan')} su significado`,
     'No entran a las sesiones hasta tener traducción o definición.',
     `<div class="actions">${hasKey() ? `<button type="button" class="btn btn-dark btn-sm" data-action="enrich-pending" ${state.ui.enrichBusy ? 'disabled' : ''}>${state.ui.enrichBusy ? `<span class="spinner"></span><span>${esc(state.ui.enrichBusy)}</span>` : `${icon('sparkle', 18)}<span>Enriquecer con IA</span>`}</button>` : ''}

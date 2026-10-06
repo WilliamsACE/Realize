@@ -608,6 +608,7 @@ function analyzeUnits(units) {
     let e = lemmas.get(k);
     if (!e) lemmas.set(k, (e = { lemma: k, freq: 0, forms: new Map(), sentIdx: [] }));
     e.freq += n;
+    e.lower = (e.lower || 0) + (stats.get(form)?.lower || 0);   // veces que apareció en minúscula
     e.forms.set(form, n);
     for (const si of formSents.get(form) || []) if (e.sentIdx.length < 12 && !e.sentIdx.includes(si)) e.sentIdx.push(si);
   }
@@ -616,7 +617,7 @@ function analyzeUnits(units) {
     const forms = [...e.forms.entries()].sort((a, b) => b[1] - a[1]).map(f => f[0]);
     const sents = e.sentIdx.sort((a, b) => a - b).map(i => sentences[i]);
     return {
-      lemma: e.lemma, forms, freq: e.freq, ...(phrase ? { phrase: true } : {}),
+      lemma: e.lemma, forms, freq: e.freq, ...(phrase ? { phrase: true } : e.lower === 0 ? { capOnly: true } : {}),
       locs: [...new Set(sents.map(s => s.loc).filter(Boolean))].slice(0, 5),
       examples: pickExamples(sents, forms),
     };
@@ -665,8 +666,8 @@ function addStudyWord(seg, cand, stage) {
 
 // Modo automático: intensivo para las 10 palabras en estudio más frecuentes.
 function computeAutoTop(seg) {
-  return seg.candidates.filter(c => ['familiar', 'unknown', 'studying'].includes(c.status))
-    .sort((a, b) => b.freq - a.freq).slice(0, AUTO_INTENSIVE_TOP).map(c => c.lemma);
+  return rankedCands(seg).filter(c => ['familiar', 'unknown', 'studying'].includes(c.status))
+    .slice(0, AUTO_INTENSIVE_TOP).map(c => c.lemma);
 }
 
 function createSegment(bs) {
@@ -702,6 +703,7 @@ function candState(c, idx) {
     const label = c.status === 'familiar' ? 'Me suena' : c.status === 'unknown' ? 'No la sé' : 'En estudio';
     return { key: c.status === 'familiar' ? 'familiar' : c.status === 'unknown' ? 'unknown' : 'studying', label: `${label} · ${isStudyReady(w) ? (isNew(w) ? 'nueva' : STAGES[w.stage].toLowerCase()) : 'sin significado'}`, cls: 'chip-accent' };
   }
+  if (c.status === 'skipped') return { key: 'skipped', label: 'Descartada', cls: '' };
   return { key: 'pending', label: 'Sin revisar', cls: '' };
 }
 
@@ -724,14 +726,15 @@ function segmentStats(seg) {
 }
 const segWords = seg => state.data.words.filter(w => w.segIds.includes(seg.id));
 
-const nextPending = (seg, idx = studyIndex()) => seg.candidates.find(c => c.status === 'pending' && candState(c, idx).key === 'pending');
+// La siguiente palabra por revisar: la más importante que quede (no la más frecuente).
+const nextPending = (seg, idx = studyIndex()) => rankedCands(seg).find(c => c.status === 'pending' && candState(c, idx).key === 'pending');
 
 function triageDecide(seg, cand, decision) {
   seg.history.push({ lemma: cand.lemma, prev: cand.status, decision });
   seg.history = seg.history.slice(-40);
   cand.status = decision;
   if (decision === 'known') libMarkKnown(cand.lemma, 'known', 'triage');
-  else addStudyWord(seg, cand, decision === 'familiar' ? 2 : 1);
+  else if (decision !== 'skipped') addStudyWord(seg, cand, decision === 'familiar' ? 2 : 1);   // «skipped»: no se estudia
   seg.autoTop = computeAutoTop(seg);
   libSaveSegment(seg);
 }
@@ -772,7 +775,7 @@ const KIND_UNIT = { pages: ['página', 'páginas'], chapters: ['capítulo', 'cap
 const MODE_INFO = {
   relaxed: { title: 'Relajado', text: 'Reconocer la palabra al leer. Tarjeta, opción múltiple y a veces escribirla. 5–10 min.' },
   intensive: { title: 'Intensivo', text: 'Dominar y usar la palabra: repasos seguidos, completar oraciones del libro, escribir tus propias oraciones y una mini prueba.' },
-  auto: { title: 'Automático', text: `Intensivo para las ${AUTO_INTENSIVE_TOP} palabras más frecuentes y relajado para el resto.` },
+  auto: { title: 'Automático', text: `Intensivo para las ${AUTO_INTENSIVE_TOP} palabras más importantes y relajado para el resto.` },
 };
 
 function modePicker(current, action) {
@@ -974,6 +977,8 @@ function renderSegment(id) {
     <span class="hint">Cuenta ocurrencias: una palabra que aparece 30 veces pesa más que una que aparece una vez. Las palabras comunes, los nombres propios y las que ya sabes cuentan como conocidas.${ready ? '' : ` Te falta ${fmtPct(Math.max(0, target - p))}.`}</span>
   </div>
 
+  ${freqLoading() ? '<div class="card"><span class="row gap-sm"><span class="spinner"></span><span class="muted small">Calculando qué palabras son más importantes…</span></span></div>' : planCard(seg)}
+
   <div class="stat-grid seg-stats">
     ${tile(st.total, 'Palabras del texto')}${tile(st.pending, 'Sin revisar')}${tile(st.known, 'La sé')}
     ${tile(st.familiar, 'Me suenan')}${tile(st.unknown + st.studying, 'No la sé / en estudio')}${tile(st.learned, 'Aprendidas', 'ok')}
@@ -983,7 +988,7 @@ function renderSegment(id) {
     <div class="col-main stack">
       <div class="card step-row">
         <span class="step-num">1</span>
-        <div class="stack-xs grow"><b>Revisar palabras</b><span class="hint">${st.pending ? `${plural(st.pending, 'palabra por revisar', 'palabras por revisar')}, de la más frecuente a la menos.` : 'Revisaste todas las palabras candidatas.'}</span></div>
+        <div class="stack-xs grow"><b>Revisar palabras</b><span class="hint">${st.pending ? `${plural(st.pending, 'palabra por revisar', 'palabras por revisar')}, de la más importante a la menos.${planFor(seg).need ? ` Te faltan ${planFor(seg).need} para tu meta.` : ' Ya cumpliste tu meta.'}` : 'Revisaste todas las palabras candidatas.'}</span></div>
         <a class="btn ${st.pending ? 'btn-primary' : 'btn-secondary'} btn-sm" href="#/triage/${seg.id}">${st.pending ? (seg.history.length ? 'Continuar' : 'Empezar') : 'Ver resumen'}</a>
       </div>
       <div class="card step-row">
@@ -1011,7 +1016,7 @@ function renderSegment(id) {
       </div>
       <div class="card step-row">
         <span class="step-num">4</span>
-        <div class="stack-xs grow"><b>Prueba final de la lectura</b><span class="hint">${lastTest ? `Último resultado: ${Math.round((lastTest.score / lastTest.total) * 100)}% (${lastTest.score}/${lastTest.total}) · ${new Date(lastTest.at).toLocaleDateString('es')}` : 'Examen mezclado con todas las palabras en estudio del segmento.'}</span></div>
+        <div class="stack-xs grow"><b>Prueba final de la lectura</b><span class="hint">${lastTest ? `Último resultado: ${Math.round((lastTest.score / lastTest.total) * 100)}% (${lastTest.score}/${lastTest.total}) · ${new Date(lastTest.at).toLocaleDateString('es')}` : 'Examen mezclado con todas las palabras en estudio de la lectura.'}</span></div>
         <a class="btn btn-secondary btn-sm ${st.ready >= 3 ? '' : 'disabled'}" href="${st.ready >= 3 ? `#/prueba/${seg.id}` : '#/segmento/' + seg.id}" ${st.ready >= 3 ? '' : 'aria-disabled="true"'}>Hacer prueba</a>
       </div>
     </div>
@@ -1039,28 +1044,30 @@ function renderSegment(id) {
 function renderTriage(id) {
   const seg = segmentById(id);
   if (!seg) return `<div class="page-head"><h1>Lectura no encontrada</h1></div>`;
+  if (freqLoading()) return '<div class="card narrow"><span class="row gap-sm"><span class="spinner"></span><span class="muted">Preparando las palabras, de la más importante a la menos…</span></span></div>';
   const idx = studyIndex();
   const cand = nextPending(seg, idx);
-  const total = seg.candidates.length;
-  const reviewed = seg.candidates.filter(c => c.status !== 'pending').length;
   if (!cand) return renderTriageSummary(seg);
+  const plan = planFor(seg);
+  if ((plan.K > 0 ? plan.chosen >= plan.K : plan.plan.mode === 'coverage') && !state.ui.planContinue?.has(seg.id)) return goalReachedCard(seg, plan);
   const showEx = !state.data.settings.noSpoilers || state.ui.triageReveal === cand.lemma;
   const w = { word: cand.lemma, forms: cand.forms };
   return `
   <div class="study-head">
     <div class="row between">
-      <span class="small" style="font-weight:600;color:var(--muted)">${esc(seg.title)} · Revisar palabras · ${reviewed + 1} de ${total}</span>
+      <span class="small" style="font-weight:600;color:var(--muted)">${esc(seg.title)} · Revisar palabras · Meta: ${plan.chosen} de ${plan.K}</span>
       <span class="actions">
         ${seg.history.length ? '<button type="button" class="btn-link" data-action="triage-undo">Deshacer</button>' : ''}
         <a class="btn-link" href="#/segmento/${seg.id}">Pausar</a>
       </span>
     </div>
-    <div class="progress"><div style="width:${Math.round((reviewed / Math.max(1, total)) * 100)}%"></div></div>
+    <div class="progress"><div style="width:${plan.K ? Math.min(100, Math.round((plan.chosen / plan.K) * 100)) : 100}%"></div></div>
   </div>
   <div class="card stack-lg narrow triage-card">
     <div class="stack-xs">
       <div class="word-title"><h1 class="word-xl">${esc(cand.lemma)}</h1>${speakBtn(cand.lemma, 'Escuchar pronunciación')}${cand.phrase ? '<span class="chip chip-accent">Expresión</span>' : ''}</div>
       <span class="muted">Aparece ${plural(cand.freq, 'vez', 'veces')}${cand.locs.length ? ` · ${esc(cand.locs.slice(0, 3).join(', '))}` : ''}${cand.forms.length > 1 ? ` · formas: ${esc(cand.forms.slice(0, 4).join(', '))}` : ''}</span>
+      ${triageInsights(cand)}
     </div>
     ${cand.examples.length ? (showEx
       ? `<div class="stack-sm">${cand.examples.map(e => `<p class="lead">${highlightWord(e.text, w)}${e.loc ? ` <span class="hint">· ${esc(e.loc)}</span>` : ''}</p>`).join('')}</div>`
@@ -1070,12 +1077,13 @@ function renderTriage(id) {
       <button type="button" class="tbtn tbtn-familiar" data-action="triage-decide" data-decision="familiar"><span class="key">2</span><b>Me suena</b></button>
       <button type="button" class="tbtn tbtn-unknown" data-action="triage-decide" data-decision="unknown"><span class="key">3</span><b>No la sé</b></button>
     </div>
-    <p class="hint">Atajos: 1, 2 y 3 · Z para deshacer. «Me suena» se salta la presentación de la palabra; «No la sé» empieza desde el principio.</p>
+    <button type="button" class="tbtn-skip ${infoOf(cand).skip ? 'is-suggested' : ''}" data-action="triage-decide" data-decision="skipped"><span class="key">4</span><span>No vale la pena estudiarla</span></button>
+    <p class="hint">Atajos: 1, 2, 3 y 4 · Z para deshacer. «Me suena» se salta la presentación de la palabra; «No la sé» empieza desde el principio.</p>
   </div>`;
 }
 
 function renderTriageSummary(seg) {
-  const c = { known: 0, familiar: 0, unknown: 0, studying: 0 };
+  const c = { known: 0, familiar: 0, unknown: 0, studying: 0, skipped: 0 };
   for (const x of seg.candidates) if (c[x.status] !== undefined) c[x.status]++;
   const st = segmentStats(seg);
   const total = seg.candidates.length;
@@ -1083,7 +1091,7 @@ function renderTriageSummary(seg) {
   return `
   <div class="card stack-lg narrow">
     <div class="stack-xs"><span class="eyebrow">${esc(seg.title)} · Revisión terminada</span><h1 class="word-lg">Resumen</h1></div>
-    <p class="lead">De ${plural(total, 'palabra', 'palabras')}: <b>${c.known}</b> las sabes, <b>${c.familiar}</b> te suenan y <b>${c.unknown}</b> no las sabes${c.studying ? ` (${c.studying} ya estaban en estudio)` : ''}.</p>
+    <p class="lead">De ${plural(total, 'palabra', 'palabras')}: <b>${c.known}</b> las sabes, <b>${c.familiar}</b> te suenan y <b>${c.unknown}</b> no las sabes${c.skipped ? ` y <b>${c.skipped}</b> las descartaste` : ''}${c.studying ? ` (${c.studying} ya estaban en estudio)` : ''}.</p>
     <div class="coverage-mini row between"><span>Comprensión actual</span><b>${fmtPct(segmentCoverage(seg))}</b></div>
     ${canVerify && !isDismissed(`verify-${seg.id}`) ? banner('info', '¿Seguro que las sabes?', `Comprueba una muestra de ${Math.min(10, c.known)} palabras con opción múltiple. Las que falles pasarán a estudio.`,
       `<div class="actions">${hasKey() ? `<a class="btn btn-primary btn-sm" href="#/verificar/${seg.id}">Verificar una muestra</a>` : `<a class="btn btn-secondary btn-sm" href="#/ajustes">${icon('sparkle', 16)}<span>Conectar IA para verificar</span></a>`}</div>`, `verify-${seg.id}`) : ''}
@@ -1098,13 +1106,13 @@ function renderTriageSummary(seg) {
 
 /* ---------- Glosario ---------- */
 
-const GL_FILTERS = [['all', 'Todas'], ['pending', 'Sin revisar'], ['known', 'La sé'], ['familiar', 'Me suena'], ['unknown', 'No la sé / en estudio'], ['learned', 'Aprendidas / dominadas']];
+const GL_FILTERS = [['all', 'Todas'], ['pending', 'Sin revisar'], ['known', 'La sé'], ['familiar', 'Me suena'], ['unknown', 'No la sé / en estudio'], ['learned', 'Aprendidas / dominadas'], ['skipped', 'Descartadas']];
 
 function glossaryRows(seg) {
   const idx = studyIndex();
   const q = normalize(state.ui.glSearch || '');
   const f = state.ui.glFilter || 'all';
-  const rows = seg.candidates.filter(c => {
+  const rows = rankedCands(seg).filter(c => {
     const st = candState(c, idx).key;
     if (f === 'unknown' && !(st === 'unknown' || st === 'studying')) return false;
     if (f === 'learned' && !(st === 'learned' || st === 'mastered')) return false;
@@ -1120,9 +1128,9 @@ function glossaryRows(seg) {
     const meaning = w?.translation || state.lib.aiCache.get(c.lemma)?.content?.translation || '';
     return `<div class="list-row">
       <div class="stack-xs"><span class="list-word" title="${esc(c.forms.join(', '))}">${esc(w?.word || c.lemma)}</span><span class="muted small">${meaning ? esc(meaning) : '<i>—</i>'}</span></div>
-      <div class="list-meta"><span class="chip ${st.cls}">${esc(st.label)}</span><span class="muted small">×${c.freq}${c.locs[0] ? ` · ${esc(c.locs[0])}` : ''}</span></div>
+      <div class="list-meta"><span class="chip ${st.cls}">${esc(st.label)}</span><span class="imp-badge sm t-${infoOf(c).tier.key}" title="${esc(infoOf(c).lang)}">${infoOf(c).tier.label}</span>${infoOf(c).skip ? `<span class="imp-flag hard">${esc(infoOf(c).flags.find(f => f.hard).label)}</span>` : ''}<span class="muted small">×${c.freq}${c.locs[0] ? ` · ${esc(c.locs[0])}` : ''}</span></div>
       <div class="list-actions">
-        ${st.key === 'pending' || st.key === 'known' ? `<button type="button" class="btn-link" data-action="gl-study" data-lemma="${esc(c.lemma)}">Estudiar</button>` : ''}
+        ${st.key === 'pending' || st.key === 'known' || st.key === 'skipped' ? `<button type="button" class="btn-link" data-action="gl-study" data-lemma="${esc(c.lemma)}">Estudiar</button>` : ''}
         ${st.key !== 'known' && st.key !== 'learned' && st.key !== 'mastered' ? `<button type="button" class="btn-link" data-action="gl-known" data-lemma="${esc(c.lemma)}">La sé</button>` : ''}
       </div>
     </div>`;
@@ -1243,8 +1251,9 @@ Object.assign(ROUTE_ENTER, {
       if (state.ui.book === bs) refreshIfOn('libro');
     });
   },
-  triage: () => { state.ui.triageReveal = null; },
-  glosario: id => { if (state.ui.glSeg !== id) { state.ui.glSeg = id; state.ui.glSearch = ''; state.ui.glFilter = 'all'; } },
+  segmento: () => { ensureFreq(); },
+  triage: () => { state.ui.triageReveal = null; ensureFreq(); },
+  glosario: id => { ensureFreq(); if (state.ui.glSeg !== id) { state.ui.glSeg = id; state.ui.glSearch = ''; state.ui.glFilter = 'all'; } },
   prueba: id => {
     const seg = segmentById(id);
     state.ui.quizInfo = null;
@@ -1520,10 +1529,10 @@ Object.assign(bindings, {
   'capture-seg': el => { state.data.captureSeg = el.value; persist(); },
 });
 
-// Atajos del triage: 1 = La sé, 2 = Me suena, 3 = No la sé, Z = deshacer.
+// Atajos del triage: 1 = La sé, 2 = Me suena, 3 = No la sé, 4 = No vale la pena, Z = deshacer.
 KEY_HANDLERS.push((e, route) => {
   if (route !== 'triage') return false;
-  const decision = { 1: 'known', 2: 'familiar', 3: 'unknown' }[e.key];
+  const decision = { 1: 'known', 2: 'familiar', 3: 'unknown', 4: 'skipped' }[e.key];
   if (decision) { view.querySelector(`[data-decision="${decision}"]`)?.click(); e.preventDefault(); return true; }
   if (e.key === 'z' || e.key === 'Z') { actions['triage-undo'](); e.preventDefault(); return true; }
   return false;

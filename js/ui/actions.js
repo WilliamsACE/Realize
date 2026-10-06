@@ -411,6 +411,7 @@ const actions = {
     render();
   },
   'filter-noai': () => { state.ui.filter = 'noai'; go('palabras'); },
+  'filter-new': () => { state.ui.filter = 'new'; go('palabras'); },
   'show-noai': () => { state.ui.filter = 'noai'; render(); },
   'toggle-pin': el => {
     const w = findWord(el.dataset.id);
