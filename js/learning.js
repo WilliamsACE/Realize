@@ -281,6 +281,32 @@ function trackHard(s, w, grade) {
   libSaveSegment(seg);
 }
 
+/* Difíciles del día: las que se fallan (pesa 2) o se marcan «Difícil» (pesa 1) en cualquier
+   sesión de hoy. Se repasan aparte (estudiar/dificiles) y acertarlas ahí las saca de la lista
+   (pasan a `beaten`). Al cambiar de día la lista empieza vacía. Se guarda en stats para sincronizarse. */
+const DAILY_HARD_MAX = 15;   // palabras por repaso
+function dailyHardList(now = Date.now()) {
+  const st = state.data.stats;
+  const today = dateKey(now);
+  if (st.dailyHard?.date !== today) st.dailyHard = { date: today, ids: {}, beaten: [] };
+  return st.dailyHard;
+}
+function dailyHardIds(now = Date.now()) {
+  return Object.entries(dailyHardList(now).ids)
+    .filter(([id]) => { const w = findWord(id); return w && isStudyReady(w); })
+    .sort((a, b) => b[1] - a[1]).slice(0, DAILY_HARD_MAX).map(([id]) => id);
+}
+function trackDailyHard(s, w, grade) {
+  const dh = dailyHardList();
+  if (grade === 'again' || grade === 'hard') {
+    dh.ids[w.id] = (dh.ids[w.id] || 0) + (grade === 'again' ? 2 : 1);
+    dh.beaten = dh.beaten.filter(id => id !== w.id);
+  } else if (s.dailyHard && dh.ids[w.id]) {
+    delete dh.ids[w.id];
+    if (!dh.beaten.includes(w.id)) dh.beaten.push(w.id);
+  }
+}
+
 /* Palabras fijadas (★ en Mis palabras): entran a todas las sesiones aunque no les toque
    repaso y sin contar para la meta de nuevas, y vuelven una vez más en la sesión tras
    acertarlas. Al aprenderse se desfijan solas. */
@@ -289,12 +315,13 @@ function pinnedExtra(pool, taken) {
   return pool.filter(w => w.pinned && !taken.has(w.id)).slice(0, PIN_MAX);
 }
 
-function buildSession(data, { force = false, segId = null, all = false, hard = false } = {}) {
+// dailyHard: repaso de las difíciles del día (ver dailyHardIds).
+function buildSession(data, { force = false, segId = null, all = false, hard = false, dailyHard = false } = {}) {
   const now = Date.now();
   const pool = data.words.filter(w => isStudyReady(w) && (!segId || w.segIds.includes(segId)));
   const newOrder = (a, b) => (b.freq || 0) - (a.freq || 0) || a.createdAt - b.createdAt;
   const blocks = all && segId ? prepBlocks(pool, now, !!segmentById(segId)?.prepPasses) : null;
-  const hardQueue = hard && segId ? hardIds(segmentById(segId)) : null;
+  const hardQueue = hard && segId ? hardIds(segmentById(segId)) : dailyHard ? dailyHardIds(now) : null;
   let reviews = [], fresh = [];
   if (blocks || hardQueue) {
     // la cola se llena bloque a bloque (ver prepareExercise y la acción next-block)
@@ -329,6 +356,7 @@ function buildSession(data, { force = false, segId = null, all = false, hard = f
     queue, pos: 0, done: 0, startedAt: now, endedAt: null, finished: false, timeUp: false,
     blocks, block: 0, betweenBlocks: false,
     reviewing: !!hardQueue,   // repaso de las que más costaron (al final de los bloques o por separado)
+    dailyHard: !!dailyHard, hardStart: dailyHard ? [...hardQueue] : null,
     // Preparando una lectura no hay límite de tiempo: se para entre bloques.
     segId, maxMs: blocks || hardQueue ? Infinity : seg?.mode === 'relaxed' ? RELAXED_SESSION_MS : SESSION_MAX_MS,
     seen: {}, learn: {}, intensiveSeen: {}, rescued: {}, pinAgain: {},
@@ -470,15 +498,18 @@ async function loadRescueAid(w, ex) {
 }
 
 // Preguntas de contraste: oraciones con hueco donde va la palabra o una de las que se confunden.
+// Solo se pregunta por palabras que están en Mis palabras: las confusables que no están ahí
+// salen como opciones (para aprender a distinguirlas), nunca como la respuesta.
 function buildContrast(w) {
   const aid = w.rescueAid;
   if (!aid?.confusables?.length) return [];
   const words = [w.word, ...aid.confusables.map(c => c.word)];
+  const own = new Set(state.data.words.map(x => normalize(x.word)));
   const stem = x => { const n = normalize(x); return n.length > 4 && /[ey]$/.test(n) ? n.slice(0, -1) : n; };
   return shuffle((aid.contrast || []).map(c => {
     const a = normalize(c.answer);
     const answer = words.find(x => normalize(x) === a) || words.find(x => a.startsWith(stem(x)));
-    return answer ? { sentence: c.sentence, fill: c.answer, answer, options: shuffle(words), chosen: null } : null;
+    return answer && own.has(normalize(answer)) ? { sentence: c.sentence, fill: c.answer, answer, options: shuffle(words), chosen: null } : null;
   }).filter(Boolean));
 }
 
@@ -549,6 +580,7 @@ function finishItem(w, grade, delta, { requeue = false, exType = 0 } = {}) {
   }
   if (isLeech(w) && !w.leechAt) w.leechAt = now;
   trackHard(s, w, grade);
+  if (s) trackDailyHard(s, w, grade);
   updateLearnedStatus(w);
   w.lastReviewedAt = now;
   recordActivity(state.data.stats, now);

@@ -102,6 +102,7 @@ function defaultStats() {
     freezes: 0,        // protectores de racha guardados (ver recordStreak)
     frozenDays: [],    // días cubiertos por un protector
     lastExportAt: null,
+    dailyHard: null,   // difíciles del día: { date, ids: { wordId: peso }, beaten: [ids] } (ver learning.js)
   };
 }
 function defaultData() { return { version: 2, words: sampleWords(), settings: { ...defaultSettings(), welcomeDone: false }, stats: defaultStats(), captures: [], groups: [] }; }

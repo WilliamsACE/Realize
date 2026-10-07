@@ -11,10 +11,13 @@ const ROUTES = {
 // Preparación al entrar a una ruta (reading.js agrega las suyas).
 const ROUTE_ENTER = {
   // «Estudiar» es un submenú: el repaso diario vive en estudiar/diario (ver renderStudy).
+  // estudiar/dificiles es el repaso de las difíciles del día: usa la misma sesión, así que
+  // al pasar de un repaso al otro se arma uno nuevo.
   estudiar: param => {
-    if (param !== 'diario') return;
+    if (param !== 'diario' && param !== 'dificiles') return;
     const s = state.ui.session;
-    if (!s || s.finished) { state.ui.session = buildSession(state.data); prepareExercise(); }
+    const dailyHard = param === 'dificiles';
+    if (!s || s.finished || !!s.dailyHard !== dailyHard) { state.ui.session = buildSession(state.data, { dailyHard }); prepareExercise(); }
   },
   palabras: () => { state.ui.pinOrder = null; state.ui.sel = new Set(); state.ui.selMode = false; if (state.ui.filter === 'lowvalue') ensureFreq(); },   // el orden de las fijadas se toma al dibujar la lista
   editar: param => {
@@ -113,7 +116,7 @@ function render() {
     if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
   // Submenú de Estudiar en la barra lateral (escritorio).
-  const sub = r.name === 'estudiar' ? { diario: 'diario', grupos: 'grupos', practica: 'grupos' }[r.param] : null;
+  const sub = r.name === 'estudiar' ? { diario: 'diario', dificiles: 'dificiles', grupos: 'grupos', practica: 'grupos' }[r.param] : null;
   document.querySelectorAll('.nav-sublink').forEach(a => {
     const on = a.dataset.sub === sub;
     a.classList.toggle('active', on);

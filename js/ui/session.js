@@ -10,7 +10,7 @@ const curWord = () => { const ex = state.ui.session?.ex; return ex ? findWord(ex
 function renderStudyHub() {
   const plan = dailyPlan();
   const s = state.ui.session;
-  const resume = s && !s.finished && s.done > 0 && s.queue.length > s.pos;
+  const resume = s && !s.dailyHard && !s.finished && s.done > 0 && s.queue.length > s.pos;
   const ready = groups().filter(canPractice);
   const daily = `<a class="hub-card hub-daily" href="#/estudiar/diario">
       <span class="hub-icon">${icon('repeat', 24)}</span>
@@ -29,7 +29,7 @@ function renderStudyHub() {
     </a>`;
   return `
   <div class="page-head"><span class="muted small">Estudiar</span><h1>¿Qué practicamos hoy?</h1></div>
-  <div class="hub">${daily}${groupsCard}</div>
+  <div class="hub">${daily}${groupsCard}${dailyHardCard()}</div>
   <section class="card hub-foot">
     <span class="icon-tile">${icon('link')}</span>
     <div class="stack-xs grow"><b>Grupos de palabras</b>
@@ -41,12 +41,34 @@ function renderStudyHub() {
   </section>`;
 }
 
+// Tarjeta de las difíciles del día (ver dailyHardIds en learning.js). Sin palabras no lleva a
+// ningún lado: explica de dónde salen o celebra que ya se vencieron todas.
+function dailyHardCard() {
+  const ids = dailyHardIds();
+  const beaten = dailyHardList().beaten.length;
+  const head = `<span class="hub-icon">${icon('target', 24)}</span><span class="hub-kicker">Difíciles del día</span>`;
+  if (!ids.length) {
+    return `<div class="hub-card hub-hard is-empty">${head}
+      <span class="hub-title">${beaten ? '¡Las venciste todas!' : 'Nada por ahora'}</span>
+      <span class="hub-sub">${beaten ? `Hoy superaste ${plural(beaten, 'palabra difícil', 'palabras difíciles')}. Mañana empieza una lista nueva.`
+        : 'Las palabras que falles o marques como «Difícil» en tu repaso aparecerán aquí para practicarlas otra vez antes de que acabe el día.'}</span>
+    </div>`;
+  }
+  const words = ids.slice(0, 6).map(id => `<span class="chip">${esc(findWord(id).word)}</span>`).join('');
+  return `<a class="hub-card hub-hard" href="#/estudiar/dificiles">${head}
+      <span class="hub-title">${plural(ids.length, 'palabra', 'palabras')}</span>
+      <span class="hub-sub">Las que más te costaron hoy. Repásalas otra vez para que no se te escapen.</span>
+      <span class="hub-words">${words}${ids.length > 6 ? `<span class="chip">+${ids.length - 6}</span>` : ''}</span>
+    </a>`;
+}
+
 // Estudiar es un submenú: estudiar → elegir; estudiar/diario → sesión del día;
+// estudiar/dificiles → repaso de las difíciles del día (misma sesión, con dailyHard);
 // estudiar/grupos y estudiar/practica → repaso de grupos (ui/groups.js).
 function renderStudy(param) {
   if (param === 'grupos') return renderGroupPicker();
   if (param === 'practica') return renderGroupRun();
-  if (param !== 'diario') return renderStudyHub();
+  if (param !== 'diario' && param !== 'dificiles') return renderStudyHub();
   const s = state.ui.session;
   if (!s) return '';
   if (s.betweenBlocks) return renderBlockBreak(s);
@@ -68,7 +90,7 @@ function renderStudy(param) {
   return `
   <div class="study-head">
     <div class="row between">
-      <span class="small" style="font-weight:600;color:var(--muted)">${seg ? esc(seg.title) : 'Sesión de hoy'}${s.reviewing ? ' · Las que más te costaron' : s.blocks ? ` · Bloque ${s.block + 1} de ${s.blocks.length}` : ''} · Palabra ${Math.min(pos + 1, total)} de ${total}</span>
+      <span class="small" style="font-weight:600;color:var(--muted)">${seg ? esc(seg.title) : s.dailyHard ? 'Difíciles del día' : 'Sesión de hoy'}${s.reviewing && !s.dailyHard ? ' · Las que más te costaron' : s.blocks ? ` · Bloque ${s.block + 1} de ${s.blocks.length}` : ''} · Palabra ${Math.min(pos + 1, total)} de ${total}</span>
       <span class="row gap-sm">
         <span class="chip chip-accent">${label}</span>
         <button type="button" class="btn-link" data-action="end-session">Terminar</button>
@@ -481,6 +503,18 @@ function renderSummary(s) {
       </div>
     </div>`;
   }
+  if (!s.queue.length && s.dailyHard) {
+    return `
+    <div class="card stack narrow">
+      <span class="icon-tile">${icon('target')}</span>
+      <h1 class="word-lg">No tienes palabras difíciles hoy</h1>
+      <p class="muted">Aquí aparecen las que falles o marques como «Difícil» en tus repasos de hoy.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="#/estudiar/diario">Ir al repaso diario</a>
+        <a class="btn btn-secondary" href="#/estudiar">Volver a Estudiar</a>
+      </div>
+    </div>`;
+  }
   if (!s.queue.length) {
     const waiting = state.data.words.filter(w => !isStudyReady(w) && (!s.segId || w.segIds.includes(s.segId))).length;
     return `
@@ -510,6 +544,7 @@ function renderSummary(s) {
   const answered = s.stats.correct + s.stats.almost + s.stats.wrong;
   const acc = answered ? s.stats.correct / answered : 1;
   const cheer = acc >= 0.9 ? '¡Sesión casi perfecta!' : acc >= 0.7 ? 'Vas muy bien, sigue así.' : 'Cada error te acerca a recordarlas mejor.';
+  const hardLeft = dailyHardIds();
   return `
   <div class="card stack-lg narrow summary-card">
     ${s.completed ? `<div class="celebrate" data-celebrate>
@@ -533,12 +568,35 @@ function renderSummary(s) {
       ${tile(s.done, 'Ejercicios')}${tile(s.stats.correct, 'Aciertos')}${tile(s.stats.wrong, 'Fallos')}
       ${tile(s.stats.newWords, 'Nuevas')}${tile(mins, 'Minutos')}${tile(currentStreak(state.data.stats), 'Días de racha')}
     </div>
+    ${dailyHardCallout(s, hardLeft)}
     ${q ? banner(quizScore(q) / q.questions.length >= 0.8 ? 'ok' : 'warn', `Mini prueba: ${quizScore(q)} de ${q.questions.length}`,
       q.questions.filter(x => !x.ok).map(x => esc(x.w.word)).join(', ') ? `Repasa: ${q.questions.filter(x => !x.ok).map(x => esc(x.w.word)).join(', ')}` : 'Recordaste todas las palabras de la sesión.') : ''}
     <div class="actions">
       ${s.segId ? `<a class="btn btn-primary" href="#/segmento/${s.segId}">Volver a la lectura</a>` : '<a class="btn btn-primary" href="#/inicio">Volver al inicio</a>'}
-      ${pending ? `<button type="button" class="btn btn-secondary" data-action="start-session" ${s.segId ? `data-seg="${s.segId}"` : ''}>Otra ronda (${pending})</button>` : ''}
+      ${pending && !s.dailyHard ? `<button type="button" class="btn btn-secondary" data-action="start-session" ${s.segId ? `data-seg="${s.segId}"` : ''}>Otra ronda (${pending})</button>` : ''}
     </div>
+  </div>`;
+}
+
+// Al terminar: invita a repasar las difíciles del día o, tras repasarlas, dice cuántas se vencieron.
+function dailyHardCallout(s, ids) {
+  const words = list => list.slice(0, 8).map(id => `<span class="chip">${esc(findWord(id).word)}</span>`).join('') + (list.length > 8 ? `<span class="chip">+${list.length - 8}</span>` : '');
+  if (s.dailyHard) {
+    const beaten = (s.hardStart || []).filter(id => !ids.includes(id)).length;
+    if (!ids.length) return banner('ok', '¡Venciste las difíciles de hoy!', `${plural(beaten, 'palabra salió', 'palabras salieron')} de la lista.`);
+    return `<div class="dh-callout">
+      <span class="icon-tile">${icon('target')}</span>
+      <div class="stack-xs grow"><b>${beaten ? `Venciste ${beaten}. ` : ''}Aún ${ids.length === 1 ? 'te cuesta 1' : `te cuestan ${ids.length}`}</b>
+        <div class="chips">${words(ids)}</div></div>
+      <button type="button" class="btn btn-primary btn-sm" data-action="daily-hard">Otra vuelta</button>
+    </div>`;
+  }
+  if (!ids.length) return '';
+  return `<div class="dh-callout">
+    <span class="icon-tile">${icon('target')}</span>
+    <div class="stack-xs grow"><b>${ids.length === 1 ? 'Esta te costó' : `Estas ${ids.length} te costaron`} hoy</b>
+      <div class="chips">${words(ids)}</div></div>
+    <button type="button" class="btn btn-primary btn-sm" data-action="daily-hard">Repasar las difíciles</button>
   </div>`;
 }
 
@@ -547,7 +605,7 @@ function renderSummary(s) {
 function activeQuiz() {
   const r = currentRoute();
   if (r.name !== 'estudiar') return state.ui.quiz;
-  return r.param === 'diario' ? state.ui.session?.quiz : r.param === 'practica' ? curGroupStep()?.quiz : null;
+  return r.param === 'diario' || r.param === 'dificiles' ? state.ui.session?.quiz : r.param === 'practica' ? curGroupStep()?.quiz : null;
 }
 
 function renderQuiz(q) {

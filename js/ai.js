@@ -207,15 +207,28 @@ const RESCUE_SCHEMA = {
   required: ['mnemonic', 'why', 'confusables', 'contrast'],
 };
 
+// Palabras que el usuario ya estudia, las más parecidas en escritura primero: la IA elige de
+// aquí las confusables, para no preguntarle por palabras que nunca ha visto.
+function rescueCandidates(w, max = 40) {
+  const key = normalize(w.word);
+  return state.data.words
+    .filter(x => x.id !== w.id && isStudyReady(x))
+    .map(x => ({ x, d: levenshtein(key, normalize(x.word)) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, max)
+    .map(({ x }) => `${x.word} = ${x.translation || x.definition}`);
+}
+
 function rescuePrompt(w) {
   const ctx = w.contexts?.[0]?.text;
+  const own = rescueCandidates(w);
   return `A Spanish-speaking learner (B1-B2) keeps forgetting the English word "${w.word}"${w.pos ? ` (${w.pos})` : ''}, which means "${w.translation}"${w.definition ? ` (${w.definition})` : ''}.
-${ctx ? `It appears in the book they are reading: "${ctx.slice(0, 300)}"\n` : ''}${w.mistakes?.length ? `Their wrong answers so far: ${w.mistakes.map(m => `"${m}"`).join(', ')}.\n` : ''}${w.mnemonic ? `This memory trick did NOT work for them: "${w.mnemonic}".\n` : ''}
+${ctx ? `It appears in the book they are reading: "${ctx.slice(0, 300)}"\n` : ''}${w.mistakes?.length ? `Their wrong answers so far: ${w.mistakes.map(m => `"${m}"`).join(', ')}.\n` : ''}${w.mnemonic ? `This memory trick did NOT work for them: "${w.mnemonic}".\n` : ''}${own.length ? `Other words they are studying (word = meaning): ${own.join('; ')}.\n` : ''}
 Return JSON: {"mnemonic", "why", "confusables", "contrast"}
 - mnemonic: a NEW memory trick in Spanish (max 30 words), different from the one that failed. Prefer the keyword method: a Spanish word that sounds like "${w.word}" linked to its meaning in one concrete, vivid, even absurd mental image.
 - why: in Spanish, max 25 words: the most likely reason this word is hard for them (false friend, similar spelling to another word, abstract meaning...).
-- confusables: 2 or 3 English words they are likely to confuse with "${w.word}" (similar spelling, sound or meaning; include their wrong answers if those are English words). Each one: word, meaning (Spanish, 1-3 words), difference (Spanish, max 20 words: how to tell it apart from "${w.word}").
-- contrast: 4 short, natural English sentences, each with "___" in place of exactly ONE word. Exactly 2 must be completed by "${w.word}" and the others by one of the confusables. Only one of the words must fit each sentence. answer: the word that fills the gap, as written in the sentence.`;
+- confusables: 2 or 3 English words they are likely to confuse with "${w.word}" (similar spelling, sound or meaning; include their wrong answers if those are English words). Prefer words from the list of words they are studying; use other words only if none of those is easy to confuse with "${w.word}". Each one: word, meaning (Spanish, 1-3 words), difference (Spanish, max 20 words: how to tell it apart from "${w.word}").
+- contrast: 4 short, natural English sentences, each with "___" in place of exactly ONE word. Exactly 2 must be completed by "${w.word}" and the others by a confusable that is in the list of words they are studying (if no confusable is in that list, all 4 must be completed by "${w.word}"). Only one of the words must fit each sentence. answer: the word that fills the gap, as written in the sentence.`;
 }
 
 async function fetchRescueAid(w, settings = state.data.settings) {

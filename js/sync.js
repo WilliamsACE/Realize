@@ -237,6 +237,7 @@ function mergeStats(b, l, r) {
     sessionsDone: add(num(l, 'sessionsDone'), num(r, 'sessionsDone'), num(b, 'sessionsDone')),
     frozenDays: unionArr(l.frozenDays, r.frozenDays).sort().slice(-30),
     lastExportAt: Math.max(num(l, 'lastExportAt'), num(r, 'lastExportAt')) || null,
+    dailyHard: (r.dailyHard?.date || '') > (l.dailyHard?.date || '') ? r.dailyHard : l.dailyHard ?? null,   // la del día más reciente
   };
 }
 

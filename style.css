@@ -1480,9 +1480,14 @@ details.field[open] > summary { margin-bottom: 6px; }
   .toolbar select { flex: 0 0 36%; min-width: 0; }
   .list { padding: 2px 14px; }
   .list-row { gap: 2px 8px; padding: 8px 0; }
-  .list-row > .stack-xs { flex-direction: row; align-items: baseline; gap: 8px; min-width: 0; }
-  .list-row > .stack-xs > .row { flex: none; max-width: 65%; }
+  /* Todas las filas miden lo mismo: palabra (+ «Difícil») arriba y traducción abajo, cada una
+     en una sola línea. La etapa, el próximo repaso y «Aprendida» se ven al editarla. */
+  .list-row > .stack-xs { gap: 2px; min-width: 0; }
+  .list-row > .stack-xs > .row { flex-wrap: nowrap; min-width: 0; gap: 6px; }
+  .list-word { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .list-row .badge-leech { flex: none; padding: 1px 6px; font-size: 10px; }
   .list-row > .stack-xs > .muted { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .list-meta, .list-row > .stack-xs .chip-ok { display: none; }
   .list-word { font-size: 16px; }
   .list-meta { gap: 6px; }
   .list-meta .chip { padding: 2px 8px; font-size: 11px; }
@@ -1694,10 +1699,33 @@ details.field[open] > summary { margin-bottom: 6px; }
 .hub-groups:hover .hub-deco i { animation-duration: 2.6s; }
 @keyframes deco-float { 0%, 100% { transform: translateY(0) rotate(var(--r)); } 50% { transform: translateY(-7px) rotate(calc(var(--r) + 4deg)); } }
 
+/* Difíciles del día: tono cálido, a todo lo ancho debajo de los otros dos. Vacía, solo informa. */
+.hub-hard { grid-column: 1 / -1; }
+.hub-hard .hub-icon { background: var(--err-bg); color: var(--err); }
+.hub-hard:not(.is-empty):hover { border-color: color-mix(in srgb, var(--err) 40%, var(--border)); box-shadow: 0 24px 44px -30px color-mix(in srgb, var(--err) 60%, transparent); }
+.hub-hard .hub-sub { max-width: 60ch; }
+.hub-hard.is-empty { background: transparent; border-style: dashed; }
+.hub-hard.is-empty .hub-icon { background: var(--chip); color: var(--muted); }
+.hub-hard.is-empty .hub-title { font-size: clamp(22px, 4vw, 26px); }
+.hub-hard.is-empty:hover, .hub-hard.is-empty:active, .hub-hard.is-empty:hover .hub-icon { transform: none; }
+.hub-words { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+/* Resumen de la sesión: invitación a repasar las difíciles del día */
+.dh-callout {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px 14px;
+  padding: 14px 16px; border-radius: 16px;
+  background: color-mix(in srgb, var(--err) 8%, var(--surface)); border: 1px solid color-mix(in srgb, var(--err) 22%, transparent);
+}
+.dh-callout .icon-tile { background: var(--err-bg); color: var(--err); }
+.dh-callout .grow { flex: 1 1 220px; min-width: 0; }
+.dh-callout .chips { gap: 6px; margin-top: 4px; }
+@media (max-width: 599px) { .dh-callout .btn { width: 100%; } }
+
 .hub-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .view-enter .hub-card { animation: rise .6s var(--ease-out) both; }
 .view-enter .hub-daily { animation: rise .6s var(--ease-out) both, hero-flow 14s ease-in-out infinite; }
 .view-enter .hub-card + .hub-card { animation-delay: .08s; }
+.view-enter .hub-card + .hub-card + .hub-card { animation-delay: .16s; }
 
 /* ---------- Pestañas deslizantes (Agregar: Palabras | Grupo) ---------- */
 .add-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px 20px; }

@@ -47,6 +47,8 @@ const actions = {
     prepareExercise();
     render();
   },
+  // Repaso de las difíciles del día (también para darles otra vuelta desde su propio resumen).
+  'daily-hard': () => go('estudiar/dificiles'),
   'end-session': () => {
     const s = state.ui.session;
     if (!s) return;
