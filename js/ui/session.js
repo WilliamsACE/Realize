@@ -396,6 +396,7 @@ function renderProduction(w, ex) {
       <div class="actions">
         ${hasKey() ? `<button type="submit" class="btn btn-primary" ${loading ? 'disabled' : ''}>${loading ? '<span class="spinner"></span><span>Revisando…</span>' : `${icon('sparkle')}<span>Revisar con IA</span>`}</button>` : ''}
         <button type="button" class="btn btn-secondary" data-action="self-eval" ${loading ? 'disabled' : ''}>Autoevaluar sin IA</button>
+        ${ex.reveal ? '' : '<button type="button" class="btn-link" data-action="review-forgot">No la recuerdo</button>'}
         ${ex.optional ? '<button type="button" class="btn-link" data-action="next-optional">Saltar</button>' : ''}
       </div>
       ${hasKey() ? `<p class="hint">Ctrl + Enter para enviar.${ignoredAspects().length ? ` No se corrigen ${ignoredAspects().map(x => x.split(' (')[0]).join(', ')} (<a href="#/ajustes">cambiar</a>).` : ''}</p>`
@@ -413,19 +414,56 @@ function renderProduction(w, ex) {
 }
 
 /* Repaso de la palabra mientras escribes: empieza tapado para que primero intentes
-   recordar qué significa y cómo se usa. Se destapa solo, al ver el resultado. */
+   recordar qué significa y cómo se usa. La pista enseña solo el tipo de palabra y cómo
+   se ve en una oración; el significado sigue censurado hasta pulsar «No la recuerdo».
+   Se destapa solo al ver el resultado. */
 function reviewAside(w, ex) {
   const covered = !ex.reveal && !['feedback', 'self'].includes(ex.phase);
-  return `<aside class="card col-side stack review-peek ${covered ? 'is-covered' : ''}">
+  const forgot = '<button type="button" class="btn btn-secondary btn-sm" data-action="review-forgot">No la recuerdo</button>';
+  return `<aside class="card col-side stack review-peek ${covered ? 'is-covered' : ''} ${covered && ex.hint ? 'has-hint' : ''}">
       <span class="eyebrow">Repaso de la palabra</span>
-      <div class="peek-body" ${covered ? 'aria-hidden="true" inert' : ''}>${wordInfo(w, { examples: 1, family: false })}</div>
-      ${covered ? `<div class="peek-cover">
-        <span class="icon-tile">${icon('lock')}</span>
-        <b>Primero intenta recordarla</b>
-        <span class="hint">Piensa qué significa y cómo se usa. Si te atoras, puedes mirar.</span>
-        <button type="button" class="btn btn-secondary btn-sm" data-action="reveal-review">Mostrar repaso</button>
-      </div>` : ''}
+      ${covered && ex.hint ? wordHint(w) : ''}
+      <div class="peek-censor">
+        <div class="peek-body" ${covered ? 'aria-hidden="true" inert' : ''}>${wordInfo(w, { examples: 1, family: false })}</div>
+        ${covered ? `<div class="peek-cover">
+          <span class="icon-tile">${icon('lock')}</span>
+          <b>${ex.hint ? 'Significado censurado' : 'Primero intenta recordarla'}</b>
+          <span class="hint">${ex.hint ? 'Con la pista, intenta deducir qué significa. Si sigues sin recordarla, destápalo.'
+            : 'Piensa qué significa y cómo se usa. La pista te dice qué tipo de palabra es y cómo se ve en una oración, sin decirte qué significa.'}</span>
+          <div class="actions" style="justify-content:center">
+            ${ex.hint ? '' : `<button type="button" class="btn btn-secondary btn-sm" data-action="review-hint">${icon('sparkle', 16)}<span>Pista</span></button>`}
+            ${forgot}
+          </div>
+        </div>` : ''}
+      </div>
     </aside>`;
+}
+
+// Tipo de palabra explicado para quien no recuerda la gramática (la IA lo da en inglés).
+const POS_HELP = [
+  [/phrasal/, 'Phrasal verb', 'un verbo con partícula (up, out, off…): se conjuga y la partícula va detrás o después del objeto.'],
+  [/idiom|phrase|expression|expresi/, 'Expresión', 'varias palabras que se usan juntas, como un bloque.'],
+  [/noun|sustantivo/, 'Sustantivo (noun)', 'nombra una cosa, persona, lugar o idea. Suele ir después de a, the, my…'],
+  [/verb|verbo/, 'Verbo (verb)', 'una acción o estado. Se conjuga: -s, -ed, -ing.'],
+  [/adjective|adjetivo/, 'Adjetivo (adjective)', 'describe a un sustantivo. Va antes de él (a ___ day) o después de be, look, feel…'],
+  [/adverb|adverbio/, 'Adverbio (adverb)', 'dice cómo, cuándo o cuánto. Acompaña a un verbo o a un adjetivo; muchos acaban en -ly.'],
+  [/preposition|preposici/, 'Preposición', 'une palabras e indica lugar, tiempo o relación (in, on, toward…).'],
+  [/conjunction|conjunci/, 'Conjunción', 'une dos ideas u oraciones.'],
+  [/interjection|interjecci/, 'Interjección', 'una exclamación que expresa una emoción.'],
+];
+
+// Pista sin significado: tipo de palabra, cómo se ve en una oración y con qué se combina.
+function wordHint(w) {
+  const pos = String(w.pos || '').toLowerCase();
+  const help = POS_HELP.find(([re]) => re.test(pos));
+  const sentence = displayExamples(w).find(t => findForm(t, w.word, w.forms));
+  return `<div class="peek-hint stack-sm">
+      <div class="info"><span class="eyebrow accent">${icon('sparkle', 14)} Pista · tipo de palabra</span>
+        <span>${help ? `<b>${help[1]}</b>: ${help[2]}` : w.pos ? `<b>${esc(w.pos)}</b>` : 'Sin tipo de palabra guardado.'}</span></div>
+      ${sentence ? `<div class="info"><span class="eyebrow">Así se ve en una oración</span>
+        <div class="example"><span>${highlightWord(sentence, w)}</span>${speakBtn(sentence, 'Escuchar oración', 'sm')}</div></div>` : ''}
+      ${w.collocations.length ? `<div class="info"><span class="eyebrow">Suele ir con</span><div class="chips">${w.collocations.slice(0, 4).map(c => `<span class="chip">${esc(c)}</span>`).join('')}</div></div>` : ''}
+    </div>`;
 }
 
 const VERDICTS = {
@@ -439,7 +477,9 @@ function renderFeedback(w, ex) {
   const v = VERDICTS[fb.verdict];
   const n = fb.errors.length;
   const sub = n ? (n === 1 ? 'Hay un error para corregir.' : `Hay ${n} errores para corregir.`) : fb.verdict === 'correcto' ? 'Sin errores de gramática.' : '';
-  const outcome = ex.optional ? 'Práctica opcional: no cambia tu progreso.' : {
+  const outcome = ex.optional ? 'Práctica opcional: no cambia tu progreso.'
+    : ex.forgot ? (fb.verdict === 'incorrecto' ? 'No la recordabas y aún no la usas bien: cuenta como fallo y la palabra baja una etapa. Puedes reescribirla.'
+      : 'No la recordabas: volverá en unos minutos para que la fijes, pero no baja de etapa porque la usaste bien.') : {
     correcto: 'Cuenta como acierto para tu repaso.',
     casi: 'Si sigues así, la palabra se queda en esta etapa. Reescríbela para que cuente como acierto.',
     incorrecto: 'Si sigues así, cuenta como fallo y la palabra baja una etapa. Puedes reescribirla.',
@@ -486,7 +526,10 @@ function renderSelfEval(w, ex) {
   <div class="card stack-sm"><span class="eyebrow">Compárala con los ejemplos</span>
     ${examples.map(e => `<div class="example"><span>${esc(e)}</span>${speakBtn(e, 'Escuchar ejemplo', 'sm')}</div>`).join('') || '<p class="muted">Esta palabra no tiene ejemplos.</p>'}
   </div>
-  ${ex.optional ? '<div class="actions"><button type="button" class="btn btn-primary" data-action="next-optional">Continuar</button></div>' : `<span class="eyebrow">¿La usaste bien?</span>${gradeButtons(w)}`}
+  ${ex.optional ? '<div class="actions"><button type="button" class="btn btn-primary" data-action="next-optional">Continuar</button></div>'
+    : ex.forgot ? `<p class="hint">No la recordabas: volverá en unos minutos para que la fijes. No baja de etapa.</p>
+      <div class="actions"><button type="button" class="btn btn-primary" data-action="grade" data-grade="again" data-autofocus>Continuar</button></div>`
+    : `<span class="eyebrow">¿La usaste bien?</span>${gradeButtons(w)}`}
   <button type="button" class="btn-link" style="align-self:flex-start" data-action="rewrite">Reescribir</button>`;
 }
 

@@ -156,6 +156,7 @@ async function runGroupSuggestions() {
     const byWord = new Map(pool.map(w => [normalize(w.word), w]));
     const taken = new Set();   // cada palabra, en una sola sugerencia
     ai.list = [];
+    ai.pickIdx = null;
     for (const g of raw) {
       const ids = [], defs = {};
       g.words.forEach((text, i) => {
@@ -196,14 +197,42 @@ function aiSuggestCard() {
           <div class="sugg-words">${ws.map(w => `<div><b>${esc(w.word)}</b><span>${esc(g.defs[w.id] || primaryMeaning(w) || '')}</span></div>`).join('')}</div>
           <div class="actions">
             <button type="button" class="btn btn-primary btn-sm" data-action="sugg-accept" data-idx="${i}">${icon('plus', 16)}<span>Crear grupo</span></button>
+            ${groups().length ? `<button type="button" class="btn btn-secondary btn-sm" data-action="sugg-pick" data-idx="${i}" aria-expanded="${ai.pickIdx === i}">${icon('link', 16)}<span>Añadir a un grupo</span></button>` : ''}
             <button type="button" class="btn-link" data-action="sugg-skip" data-idx="${i}">Descartar</button>
           </div>
+          ${ai.pickIdx === i ? suggTargets(g, i) : ''}
         </div>`;
       }).join('')}
       ${ai.list && !list.length && !ai.error ? '<p class="hint">No hay más sugerencias por ahora. Agrega más palabras y vuelve a buscar.</p>' : ''}
       <button type="button" class="btn ${ai.list ? 'btn-secondary' : 'btn-primary'} btn-sm" style="align-self:flex-start" data-action="sugg-run">${icon('sparkle', 16)}<span>${ai.list ? 'Buscar otra vez' : 'Buscar grupos en mis palabras'}</span></button>`;
   }
   return `<section class="card stack ai-sugg">${head}${body}</section>`;
+}
+
+// Palabras de la sugerencia que faltan en el grupo y cuántas caben (cada tipo tiene un máximo).
+function suggFit(sugg, g) {
+  const fresh = sugg.ids.filter(id => findWord(id) && !g.ids.includes(id));
+  const room = Math.max(0, gtype(g).max - g.ids.filter(findWord).length);
+  return { fresh, room };
+}
+
+// Grupos ya existentes a los que se puede añadir una sugerencia: primero los del mismo tipo.
+function suggTargets(sugg, i) {
+  const list = [...groups()].sort((a, b) => (b.type === sugg.type) - (a.type === sugg.type));
+  return `<div class="sugg-targets" role="group" aria-label="Elige el grupo">
+      <span class="eyebrow">¿A qué grupo las añado?</span>
+      ${list.map(g => {
+        const { fresh, room } = suggFit(sugg, g);
+        const why = !fresh.length ? 'Ya tiene estas palabras' : !room ? `Lleno (máx. ${gtype(g).max})`
+          : fresh.length > room ? `Caben ${room} de ${fresh.length}` : `+${plural(fresh.length, 'palabra', 'palabras')}`;
+        return `<button type="button" class="sugg-target t-${g.type}" data-action="sugg-add-to" data-idx="${i}" data-id="${esc(g.id)}" ${fresh.length && room ? '' : 'disabled'}>
+          <span class="gsum-icon">${icon(gtype(g).icon, 16)}</span>
+          <span class="stack-xs grow" style="min-width:0"><b>${esc(groupTitle(g))}</b><span class="small muted">${why}</span></span>
+          ${fresh.length && room ? icon('plus', 16) : ''}
+        </button>`;
+      }).join('')}
+      <button type="button" class="btn-link" style="align-self:flex-start" data-action="sugg-pick" data-idx="${i}">Cancelar</button>
+    </div>`;
 }
 
 /* ---------- Piezas de vista ---------- */
@@ -866,11 +895,39 @@ Object.assign(actions, {
     const ids = g.ids.filter(id => findWord(id));
     if (ids.length >= 2) addGroup({ type: g.type, name: g.theme, ids, defs: g.defs });
     ai.list.splice(Number(el.dataset.idx), 1);
+    ai.pickIdx = null;
     toast(`Grupo ${g.theme ? `«${cap(g.theme)}» ` : ''}creado`);
     render();
   },
+  // Abre (o cierra) la lista de grupos existentes para añadir la sugerencia.
+  'sugg-pick': el => {
+    const ai = state.ui.aiSuggest;
+    if (!ai?.list) return;
+    const i = Number(el.dataset.idx);
+    ai.pickIdx = ai.pickIdx === i ? null : i;
+    render();
+  },
+  'sugg-add-to': el => {
+    const ai = state.ui.aiSuggest;
+    const sugg = ai?.list?.[Number(el.dataset.idx)], g = findGroup(el.dataset.id);
+    if (!sugg || !g) return;
+    const { fresh, room } = suggFit(sugg, g);
+    const add = fresh.slice(0, room);
+    if (!add.length) return;
+    g.ids = [...g.ids, ...add];
+    // Las definiciones de la IA solo completan: no pisan las que el grupo ya tenía.
+    for (const id of add) if (sugg.defs[id] && !g.defs[id]) g.defs[id] = sugg.defs[id];
+    persist();
+    ai.list.splice(Number(el.dataset.idx), 1);
+    ai.pickIdx = null;
+    const left = fresh.length - add.length;
+    toast(`${plural(add.length, 'palabra añadida', 'palabras añadidas')} a «${groupTitle(g)}»${left ? ` · ${left} no ${left === 1 ? 'cabía' : 'cabían'}` : ''}`);
+    render();
+  },
   'sugg-skip': el => {
-    state.ui.aiSuggest?.list?.splice(Number(el.dataset.idx), 1);
+    const ai = state.ui.aiSuggest;
+    ai?.list?.splice(Number(el.dataset.idx), 1);
+    if (ai) ai.pickIdx = null;
     render();
   },
   'group-suggest': el => {

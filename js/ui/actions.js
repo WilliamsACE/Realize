@@ -204,9 +204,10 @@ const actions = {
     const okTyped = ex.phase === 'answered' && ex.result?.ok;
     if (!okTyped && ex.phase !== 'self') return;
     ex.done = true;
-    const g = el.dataset.grade;
+    // Si no la recordaba al escribir la oración, vuelve pronto pero no baja de etapa.
+    const g = ex.phase === 'self' && ex.forgot ? 'again' : el.dataset.grade;
     if (ex.phase === 'self') saveSentence(w, ex.submitted, 'autoevaluada');
-    finishItem(w, g, g === 'again' ? -1 : +1, { requeue: g === 'again', exType: ex.phase === 'self' ? 5 : ex.type });
+    finishItem(w, g, g === 'again' ? (ex.forgot ? 0 : -1) : +1, { requeue: g === 'again', exType: ex.phase === 'self' ? 5 : ex.type });
     advance();
   },
   next: () => {
@@ -261,18 +262,23 @@ const actions = {
     ex.error = null;
     render();
   },
-  // Destapa el repaso sin repintar, para no perder lo que se está escribiendo.
-  'reveal-review': el => {
+  // Pista: tipo de palabra y cómo se ve en una oración; el significado sigue censurado.
+  'review-hint': () => {
     const ex = state.ui.session?.ex;
-    if (!ex) return;
+    if (ex?.type !== 5 || ex.reveal || ex.hint) return;
+    ex.hint = true;
+    ex.peeked = true;
+    refreshReviewAside(ex);
+  },
+  // «No la recuerdo»: quita la censura del significado y cuenta como olvido al calificar.
+  'review-forgot': () => {
+    const ex = state.ui.session?.ex;
+    if (ex?.type !== 5 || ex.reveal) return;
     ex.reveal = true;
     ex.peeked = true;
-    const box = el.closest('.review-peek');
-    box?.classList.remove('is-covered');
-    box?.querySelector('.peek-body')?.removeAttribute('inert');
-    box?.querySelector('.peek-body')?.removeAttribute('aria-hidden');
-    el.closest('.peek-cover')?.remove();
-    $('#sentence')?.focus();
+    if (!ex.optional) ex.forgot = true;
+    view.querySelectorAll('form .btn-link[data-action="review-forgot"]').forEach(b => b.remove());
+    refreshReviewAside(ex, true);
   },
   'self-eval': () => {
     const ex = state.ui.session?.ex;
@@ -300,7 +306,9 @@ const actions = {
     saveSentence(w, ex.submitted, v, ex.feedback.natural);
     if (ex.optional) { persist(); advance(); return; }
     // correcto = acierto (más difícil si necesitó reescribir); casi = se queda; incorrecto = fallo.
-    if (v === 'correcto') {
+    // Si pulsó «No la recuerdo», vuelve pronto como fallo, pero solo baja de etapa si además la usó mal.
+    if (ex.forgot) finishItem(w, 'again', v === 'incorrecto' ? -1 : 0, { requeue: true, exType: 5 });
+    else if (v === 'correcto') {
       if (wordMode(w) === 'intensive' && w.stage === 5) w.passedFinal = true;
       // Si necesitó reescribir o mirar el repaso, cuenta como «Difícil».
       finishItem(w, ex.attempts > 1 || ex.peeked ? 'hard' : 'good', +1, { exType: 5 });
@@ -611,6 +619,18 @@ const actions = {
     toast('Se borraron todas las palabras');
   },
 };
+
+// Repinta solo el repaso del ejercicio de oración, para no perder lo que se está escribiendo.
+// `show`: en el celular el repaso queda debajo del formulario; lo acerca si no se ve.
+function refreshReviewAside(ex, show = false) {
+  const w = curWord(), box = view.querySelector('.review-peek');
+  if (!w || !box) return;
+  box.outerHTML = reviewAside(w, ex);
+  const fresh = view.querySelector('.review-peek');
+  const r = fresh?.getBoundingClientRect();
+  if (show && r && (r.top > innerHeight || r.bottom < 0)) fresh.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  else $('#sentence')?.focus({ preventScroll: true });
+}
 
 async function submitSentence(skipWordCheck) {
   const s = state.ui.session, ex = s?.ex, w = curWord();

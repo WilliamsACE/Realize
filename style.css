@@ -1137,15 +1137,21 @@ details.field[open] > summary { margin-bottom: 6px; }
 
 /* ---------- Repaso tapado al escribir una oración ---------- */
 .review-peek { position: relative; overflow: hidden; }
-.review-peek.is-covered { min-height: 240px; }
+.peek-censor { position: relative; display: flex; flex-direction: column; gap: inherit; }
+.review-peek.is-covered .peek-censor { min-height: 240px; }
 .peek-body { display: flex; flex-direction: column; gap: inherit; transition: filter .35s ease, opacity .35s ease; }
 .review-peek.is-covered .peek-body { filter: blur(8px); opacity: .5; user-select: none; pointer-events: none; }
 .peek-cover {
-  position: absolute; inset: 44px 0 0; z-index: 1;
+  position: absolute; inset: 0; z-index: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
   padding: 24px; text-align: center;
   background: color-mix(in srgb, var(--surface) 45%, transparent);
 }
+/* Pista: tipo de palabra y una oración, sin el significado (que sigue censurado debajo) */
+.peek-hint { padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); animation: rise .35s var(--ease-out) both; }
+.peek-hint .eyebrow svg { vertical-align: -2px; }
+.review-peek.has-hint .peek-censor { min-height: 200px; border-radius: 12px; }
+@media (prefers-reduced-motion: reduce) { .peek-hint { animation: none; } }
 
 /* ---------- Palabras parecidas ---------- */
 .sim-words { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; min-width: 0; }
@@ -2216,6 +2222,18 @@ body[data-route="bienvenida"] .main { max-width: 560px; margin: 0 auto; padding:
 .sugg-words b { font-size: 15px; }
 .sugg-words span { font-size: 13px; color: var(--muted); line-height: 1.35; }
 .view-enter .sugg, .ai-sugg .sugg { animation: rise .45s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms); }
+/* Añadir una sugerencia a un grupo que ya existe */
+.sugg-targets { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--tc) 20%, var(--border)); animation: rise .3s var(--ease-out) both; }
+.sugg-target {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; text-align: left;
+  border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.sugg-target b { font-size: 14px; overflow-wrap: anywhere; }
+.sugg-target > svg { flex-shrink: 0; color: var(--tc); }
+.sugg-target .gsum-icon { width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; }
+.sugg-target:hover:not(:disabled) { border-color: var(--tc); background: color-mix(in srgb, var(--tb) 40%, var(--surface)); }
+.sugg-target:disabled { opacity: .55; cursor: default; }
 .sugg-loading { display: flex; flex-direction: column; gap: 10px; }
 .sugg-skeleton {
   height: 92px; border-radius: 16px;
@@ -2223,7 +2241,7 @@ body[data-route="bienvenida"] .main { max-width: 560px; margin: 0 auto; padding:
   background-size: 300% 100%; animation: shimmer 1.4s linear infinite;
 }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .sugg, .sugg-skeleton { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .sugg, .sugg-skeleton, .sugg-targets { animation: none !important; } }
 
 /* Bienvenida en el celular: tarjetas más compactas */
 .welcome-feature { align-items: center; }
